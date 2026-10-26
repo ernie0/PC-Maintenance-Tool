@@ -172,6 +172,10 @@ PcMaintenance-Setup-0.3.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS
 - 較新的 Windows（本機測試的組建 26300）一般權限無法清除 DNS 快取，按下後 Windows 會詢問系統管理員權限。
 - 不提供登錄檔清理、檔案粉碎、救回已刪除檔案等功能。
 
+## 授權
+
+以 [MIT 授權](LICENSE)釋出。安裝檔內含的第三方元件（完整版內含 .NET 執行環境，以及 CommunityToolkit.Mvvm 等套件）的授權聲明見 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)，安裝後也放在程式資料夾。
+
 ## 回報問題
 
 使用上的問題或建議請到 [Issues](https://github.com/ernie0/PC-Maintenance-Tool/issues)，附上 Windows 版本、操作步驟，以及 `%LOCALAPPDATA%\PcMaintenance\logs` 當天的記錄檔（請先確認裡面沒有不想公開的路徑或名稱）。

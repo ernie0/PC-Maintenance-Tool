@@ -72,6 +72,9 @@ Type: files; Name: "{app}\wpfgfx_cor3.dll"
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "settings.example.json"; DestDir: "{commonappdata}\PcMaintenance"; Flags: ignoreversion
+; 授權條款與第三方元件授權；完整版內含 .NET 執行環境，散布時要附上它的授權聲明。
+Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 #if FileExists(ManualPdf)
 Source: "{#ManualPdf}"; DestDir: "{app}"; DestName: "使用說明書.pdf"; Flags: ignoreversion
 #endif

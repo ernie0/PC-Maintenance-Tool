@@ -1,0 +1,80 @@
+電腦維護工具 第三方元件授權聲明
+Third-party notices for PC Maintenance Tool
+
+電腦維護工具本身以 MIT 授權釋出（見 LICENSE）。安裝檔另外包含下列第三方元件，各依其授權條款使用。
+The program itself is released under the MIT License (see LICENSE). Its installers include the
+following third-party components, each used under its own license.
+
+元件 Component                                     授權 License   來源 Source
+------------------------------------------------------------------------------------------------
+.NET 執行環境（Microsoft.NETCore.App）              MIT            https://github.com/dotnet/runtime
+  只有完整版安裝檔內含；精簡版使用電腦上已安裝的執行環境。
+  Bundled with the full installer only; the lite installer uses the runtime installed on the computer.
+Windows Desktop 執行環境（WPF，Microsoft.WindowsDesktop.App）
+                                                   MIT            https://github.com/dotnet/wpf
+  只有完整版安裝檔內含。Bundled with the full installer only.
+System.Management                                  MIT            https://github.com/dotnet/runtime
+System.ServiceProcess.ServiceController            MIT            https://github.com/dotnet/runtime
+CommunityToolkit.Mvvm                              MIT            https://github.com/CommunityToolkit/dotnet
+
+.NET 執行環境與 WPF 本身也包含其他第三方元件，其授權聲明見：
+The .NET runtime and WPF contain further third-party components; see their notices:
+  https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT
+  https://github.com/dotnet/wpf/blob/main/THIRD-PARTY-NOTICES.TXT
+
+精簡版在電腦沒有 .NET 10 桌面執行環境時，會從 Microsoft 下載官方安裝檔，由 Microsoft 的安裝程式依其授權條款安裝。
+When the .NET 10 desktop runtime is missing, the lite installer downloads Microsoft's official
+runtime installer, which installs the runtime under Microsoft's own terms.
+
+------------------------------------------------------------------------------------------------
+.NET Runtime, WPF, System.Management, System.ServiceProcess.ServiceController
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------------------------
+CommunityToolkit.Mvvm
+
+.NET Community Toolkit
+
+Copyright © .NET Foundation and Contributors
+
+All rights reserved.
+
+MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
