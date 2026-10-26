@@ -1,0 +1,123 @@
+<UserControl x:Class="PcMaintenance.App.Views.StartupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PcMaintenance.App">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,10" LastChildFill="False">
+            <ListBox DockPanel.Dock="Left" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Label"
+                     Style="{StaticResource SegmentList}" ItemContainerStyle="{StaticResource SegmentItem}"
+                     AutomationProperties.Name="篩選類型" />
+            <Button DockPanel.Dock="Right" Content="重新整理" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                    local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshCommand.IsRunning}" />
+            <CheckBox DockPanel.Dock="Right" Content="顯示 Microsoft 項目" IsChecked="{Binding ShowMicrosoft}" Margin="0,0,16,0" />
+        </DockPanel>
+
+        <!-- The search box shares this row with the count so the filter row fits the narrowest window. -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBox DockPanel.Dock="Left" Width="250" Margin="0,0,16,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     Tag="搜尋名稱、發行者或命令" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋" />
+            <Button DockPanel.Dock="Right" Content="匯出清單" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}"
+                    local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge"
+                    Margin="16,0,0,0" ToolTip="把所有項目（含 Microsoft 項目）匯出成 CSV（可用 Excel 開啟）" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{Binding CountText}" Style="{StaticResource SubtleText}" />
+                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource WarningTextBrush}" TextWrapping="Wrap"
+                           Visibility="{Binding StatusText, Converter={StaticResource TextToVisibility}}" />
+            </StackPanel>
+        </DockPanel>
+
+        <ContentControl Grid.Row="2" Style="{StaticResource Card}">
+            <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="狀態" Width="156" SortMemberPath="StateText">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border x:Name="StateChip" Style="{StaticResource Chip}" Background="{StaticResource DisabledFillBrush}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse x:Name="StateDot" Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                 Fill="{StaticResource DisabledTextBrush}" />
+                                        <TextBlock x:Name="StateLabel" Text="{Binding StateText}" FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                                        <Setter TargetName="StateChip" Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+                                        <Setter TargetName="StateDot" Property="Fill" Value="{StaticResource SuccessBrush}" />
+                                        <Setter TargetName="StateLabel" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="類型" Binding="{Binding SourceText}" Width="110" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="發行者" Binding="{Binding PublisherText}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="說明" Binding="{Binding DetailText}" Width="1.2*" ElementStyle="{StaticResource CellText}" />
+                </DataGrid.Columns>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <Setter Property="ToolTip" Value="{Binding Command}" />
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </ContentControl>
+
+        <ContentControl Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,14"
+                        Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="{Binding SelectedItem.Name}" Style="{StaticResource SectionTitle}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding SelectedItem.Location}" Style="{StaticResource SubtleText}" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding SelectedItem.Description}" Style="{StaticResource SubtleText}" Margin="0,4,0,0"
+                               Visibility="{Binding SelectedItem.Description, Converter={StaticResource TextToVisibility}}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedItem.Description}" />
+                    <TextBox Text="{Binding SelectedItem.Command, Mode=OneWay}" IsReadOnly="True" Margin="0,8,0,0" MinHeight="32"
+                             AutomationProperties.Name="命令列" />
+                    <TextBlock Text="{Binding SelectionHint}" Foreground="{StaticResource WarningTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding SelectionHint, Converter={StaticResource TextToVisibility}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                Visibility="{Binding IsServiceSelected, Converter={StaticResource InverseBoolToVisibility}}">
+                        <Button Content="停用" Command="{Binding DisableCommand}" Style="{StaticResource SecondaryButton}" MinWidth="88"
+                                local:Glyph.Text="&#xE711;" />
+                        <Button Content="啟用" Command="{Binding EnableCommand}" Style="{StaticResource PrimaryButton}" MinWidth="88" Margin="8,0,0,0"
+                                local:Glyph.Text="&#xE73E;" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding IsServiceSelected, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Text="啟動類型" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox ItemsSource="{Binding StartTypes}" SelectedItem="{Binding SelectedStartType}" DisplayMemberPath="Label"
+                                      Width="160" AutomationProperties.Name="啟動類型" />
+                            <Button Content="套用" Command="{Binding ApplyStartTypeCommand}" Style="{StaticResource PrimaryButton}" MinWidth="80" Margin="8,0,0,0"
+                                    local:Glyph.Text="&#xE73E;" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <TextBlock Text="{Binding SelectedItem.Item.ServiceStatus, StringFormat=目前：{0}}" Style="{StaticResource SubtleText}"
+                                       VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <!-- Narrower padding keeps the three buttons from crowding out the details in a small window. -->
+                            <Button Content="啟動" Command="{Binding StartServiceCommand}" Style="{StaticResource SecondaryButton}" Padding="10,0"
+                                    local:Glyph.Text="&#xE768;" local:Glyph.Busy="{Binding StartServiceCommand.IsRunning}" />
+                            <Button Content="停止" Command="{Binding StopServiceCommand}" Style="{StaticResource SecondaryButton}" Padding="10,0" Margin="8,0,0,0"
+                                    local:Glyph.Text="&#xE71A;" local:Glyph.Busy="{Binding StopServiceCommand.IsRunning}" />
+                            <Button Content="重新啟動" Command="{Binding RestartServiceCommand}" Style="{StaticResource SecondaryButton}" Padding="10,0" Margin="8,0,0,0"
+                                    local:Glyph.Text="&#xE777;" local:Glyph.Motion="Rewind" local:Glyph.Busy="{Binding RestartServiceCommand.IsRunning}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </ContentControl>
+    </Grid>
+</UserControl>

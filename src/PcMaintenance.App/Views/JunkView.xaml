@@ -1,0 +1,145 @@
+<UserControl x:Class="PcMaintenance.App.Views.JunkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PcMaintenance.App"
+             xmlns:vm="clr-namespace:PcMaintenance.App.ViewModels">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <Button Content="掃描" Command="{Binding ScanCommand}" Style="{StaticResource PrimaryButton}" MinWidth="96"
+                        local:Glyph.Text="&#xE721;" local:Glyph.Busy="{Binding ScanCommand.IsRunning}" />
+                <Button Content="清理已勾選項目" Command="{Binding CleanCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                        local:Glyph.Text="&#xEA99;" local:Glyph.Motion="Wiggle" local:Glyph.Busy="{Binding CleanCommand.IsRunning}" />
+                <Button Content="取消" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                        local:Glyph.Text="&#xE711;" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+            <TextBlock Text="{Binding ProgressText}" Style="{StaticResource SubtleText}" VerticalAlignment="Center" Margin="16,0,0,0"
+                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+        </DockPanel>
+
+        <ProgressBar Grid.Row="1" IsIndeterminate="True" Margin="0,0,0,8"
+                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+
+        <ContentControl Grid.Row="2" Style="{StaticResource Card}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:JunkCategoryRow}">
+                            <Border BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" Padding="16,11">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsAvailable}" VerticalAlignment="Center"
+                                              Margin="0,0,14,0" AutomationProperties.Name="{Binding Name}" />
+                                    <Border Grid.Column="1" Style="{StaticResource IconTile}" Width="34" Height="34" CornerRadius="9"
+                                            Background="{StaticResource SurfaceAltBrush}" Margin="0,0,14,0">
+                                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource IconText}" Foreground="{StaticResource SubtleTextBrush}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <Border Style="{StaticResource Chip}" Background="{StaticResource BadgeBrush}" Margin="8,0,0,0"
+                                                    Visibility="{Binding RequiresAdmin, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="需要系統管理員" FontSize="12" Foreground="{StaticResource BadgeTextBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource SubtleText}" FontSize="13" Margin="0,3,0,0" />
+                                        <TextBlock Text="{Binding WarningText}" Foreground="{StaticResource WarningTextBrush}" FontSize="13"
+                                                   Margin="0,3,0,0" TextWrapping="Wrap"
+                                                   Visibility="{Binding WarningText, Converter={StaticResource TextToVisibility}}" />
+                                    </StackPanel>
+                                    <!-- The state icon pops in as each category finishes scanning or cleaning. -->
+                                    <Grid Grid.Column="3" MinWidth="180" Margin="16,0,0,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Grid Width="18" Height="18" Margin="0,0,8,0">
+                                                <TextBlock x:Name="StateIcon" Style="{StaticResource IconText}" FontSize="15" Visibility="Collapsed"
+                                                           local:Motion.Kind="Pop" local:Motion.ReplayOn="{Binding State}" />
+                                                <Ellipse x:Name="StateRing" Style="{StaticResource BusyRing}" Visibility="Collapsed" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding State}" Value="Scanning">
+                                    <Setter TargetName="StateRing" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Found">
+                                    <Setter TargetName="StateIcon" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="StateIcon" Property="Text" Value="&#xEA99;" />
+                                    <Setter TargetName="StateIcon" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Nothing">
+                                    <Setter TargetName="StateIcon" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="StateIcon" Property="Text" Value="&#xE73E;" />
+                                    <Setter TargetName="StateIcon" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Cleaned">
+                                    <Setter TargetName="StateIcon" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="StateIcon" Property="Text" Value="&#xE930;" />
+                                    <Setter TargetName="StateIcon" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="NotCleaned">
+                                    <Setter TargetName="StateIcon" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="StateIcon" Property="Text" Value="&#xE7BA;" />
+                                    <Setter TargetName="StateIcon" Property="Foreground" Value="{StaticResource WarningTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="NeedsAdmin">
+                                    <Setter TargetName="StateIcon" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="StateIcon" Property="Text" Value="&#xEA18;" />
+                                    <Setter TargetName="StateIcon" Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </ContentControl>
+
+        <!-- After a cleanup the summary icon turns into a green tick. -->
+        <ContentControl Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="14,10">
+            <DockPanel>
+                <Border DockPanel.Dock="Left" Width="32" Height="32" CornerRadius="9" Margin="0,0,12,0" VerticalAlignment="Center"
+                        local:Motion.Kind="Pop" local:Motion.ReplayOn="{Binding HasCleaned}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasCleaned}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock>
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                                <Setter Property="Text" Value="&#xE946;" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasCleaned}" Value="True">
+                                        <Setter Property="Text" Value="&#xE930;" />
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+                <TextBlock Text="{Binding SummaryText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </ContentControl>
+    </Grid>
+</UserControl>

@@ -1,0 +1,76 @@
+<UserControl x:Class="PcMaintenance.App.Views.JournalView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PcMaintenance.App">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,10" LastChildFill="False">
+            <Button DockPanel.Dock="Left" Content="還原選取的變更" Command="{Binding RestoreCommand}" Style="{StaticResource PrimaryButton}"
+                    local:Glyph.Text="&#xE7A7;" local:Glyph.Motion="Rewind" />
+            <Button DockPanel.Dock="Left" Content="重新整理" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" />
+            <Button DockPanel.Dock="Right" Content="開啟記錄與備份資料夾" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource SecondaryButton}"
+                    local:Glyph.Text="&#xE838;" />
+        </DockPanel>
+
+        <TextBlock Grid.Row="1" Text="{Binding StatusText}" Style="{StaticResource SubtleText}" Margin="0,0,0,10" />
+
+        <ContentControl Grid.Row="2" Style="{StaticResource Card}">
+            <Grid>
+                <DataGrid x:Name="RecordsGrid" ItemsSource="{Binding Records}" SelectedItem="{Binding SelectedRecord}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="時間" Binding="{Binding TimeText}" Width="140" ElementStyle="{StaticResource CellText}" />
+                        <DataGridTemplateColumn Header="類型" Width="118" SortMemberPath="KindText">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding KindGlyph}" Style="{StaticResource IconText}" FontSize="14"
+                                                   Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,8,0" />
+                                        <TextBlock Text="{Binding KindText}" Style="{StaticResource CellText}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="內容" Binding="{Binding Description}" Width="1.4*" ElementStyle="{StaticResource CellText}" />
+                        <DataGridTextColumn Header="項目" Binding="{Binding Target}" Width="2*" ElementStyle="{StaticResource CellText}" />
+                        <DataGridTemplateColumn Header="狀態" Width="220" SortMemberPath="StatusText">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="StatusChip" Style="{StaticResource Chip}" Background="{StaticResource AccentSoftBrush}">
+                                        <TextBlock x:Name="StatusLabel" Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource AccentBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsRestored}" Value="True">
+                                            <Setter TargetName="StatusChip" Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+                                            <Setter TargetName="StatusLabel" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <Setter Property="ToolTip" Value="{Binding Detail}" />
+                        </Style>
+                    </DataGrid.RowStyle>
+                </DataGrid>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,48,16,16" IsHitTestVisible="False"
+                            Visibility="{Binding HasItems, ElementName=RecordsGrid, Converter={StaticResource InverseBoolToVisibility}}">
+                    <TextBlock Text="&#xE81C;" Style="{StaticResource IconText}" FontSize="28" Foreground="#B4BDC9" />
+                    <TextBlock Text="停用開機項目、移除殘留或變更服務後，會記錄在這裡。" Style="{StaticResource SubtleText}" Margin="0,10,0,0" TextAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </ContentControl>
+
+        <TextBlock Grid.Row="3" Text="{Binding SelectionHint}" Foreground="{StaticResource WarningTextBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
+                   Visibility="{Binding SelectionHint, Converter={StaticResource TextToVisibility}}" />
+    </Grid>
+</UserControl>

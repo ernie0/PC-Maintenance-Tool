@@ -1,0 +1,32 @@
+// 電腦維護工具：公司共用設定範例（內容與程式預設值相同）。
+// 使用方式：在同一個資料夾複製成 settings.json 再修改；或安裝時加 /SETTINGS="設定檔路徑"。
+// 可以寫 // 註解，最後一項後面多一個逗號也沒關係。格式錯誤時程式會改用預設值並在上方顯示提醒。
+{
+  // 暫存檔與錯誤報告至少要放幾小時才會被清理，避免刪到正在安裝的程式還在用的檔案。
+  "minFileAgeHours": 24,
+
+  // 不讓使用者清理的項目代碼，例如 ["recycle-bin"] 表示不提供清空資源回收筒。
+  // user-temp 使用者暫存檔            windows-temp Windows 暫存檔
+  // edge-cache Microsoft Edge 快取    chrome-cache Google Chrome 快取     firefox-cache Firefox 快取
+  // crash-dumps 程式當機傾印檔        user-error-reports 錯誤報告（使用者） system-error-reports 錯誤報告（系統）
+  // shader-cache 顯示卡著色器快取     system-crash-dumps 系統當機傾印檔
+  // thumbnail-cache 縮圖快取          recent-items 最近使用的項目
+  // windows-update-cache Windows 更新下載快取                            recycle-bin 資源回收筒
+  "disabledJunkCategories": [],
+
+  // 永遠不刪除的資料夾（也包含重複檔移除），路徑中的 \ 要寫成 \\，例如 "D:\\公司資料"。
+  "excludedPaths": [],
+
+  // 「開機與背景」是否列出 Microsoft 的項目。預設隱藏，避免誤停用系統元件。
+  "showMicrosoftItems": false,
+
+  // 是否允許變更服務的啟動類型（變更時仍需要系統管理員權限）。
+  "allowServiceChanges": true,
+
+  // 搜尋重複檔時預設的最小檔案大小（MB）。
+  "duplicateMinSizeMB": 1,
+
+  // 自動清理（安裝時勾選「自動清理」才會啟用）：同一位使用者兩次自動清理至少間隔幾天，0 表示每次登入都清理。
+  // 自動清理只處理預設勾選、不需要系統管理員權限的項目，程式正在執行的瀏覽器快取會略過。
+  "autoCleanIntervalDays": 7
+}

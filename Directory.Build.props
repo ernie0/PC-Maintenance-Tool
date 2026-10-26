@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.3.1</Version>
+    <Product>電腦維護工具</Product>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>zh-Hant</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>

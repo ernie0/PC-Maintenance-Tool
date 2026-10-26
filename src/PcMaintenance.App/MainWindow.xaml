@@ -1,0 +1,130 @@
+﻿<Window x:Class="PcMaintenance.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PcMaintenance.App"
+        xmlns:vm="clr-namespace:PcMaintenance.App.ViewModels"
+        xmlns:views="clr-namespace:PcMaintenance.App.Views"
+        Title="電腦維護工具" Width="1200" Height="780" MinWidth="980" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBrush}" Foreground="{StaticResource TextBrush}"
+        FontFamily="Microsoft JhengHei UI" FontSize="14"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:MaintenanceViewModel}">
+            <views:MaintenanceView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TweaksViewModel}">
+            <views:TweaksView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ToolsViewModel}">
+            <views:ToolsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:JunkViewModel}">
+            <views:JunkView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:StartupViewModel}">
+            <views:StartupView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:UninstallViewModel}">
+            <views:UninstallView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DiskViewModel}">
+            <views:DiskView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TaskManagerViewModel}">
+            <views:TaskManagerView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DiskToolsViewModel}">
+            <views:DiskToolsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MemoryViewModel}">
+            <views:MemoryView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SystemInfoViewModel}">
+            <views:SystemInfoView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:JournalViewModel}">
+            <views:JournalView />
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="232" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Same look as the program icon; the wrench turns when the window opens and when pointed at. -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="22,16,16,10">
+                    <Border x:Name="Logo" Width="38" Height="38" CornerRadius="10" Background="{StaticResource LogoBrush}">
+                        <TextBlock Text="&#xE90F;" Style="{StaticResource IconText}" FontSize="19" Foreground="White"
+                                   local:Motion.Kind="Twist" local:Motion.PlayOnLoad="True"
+                                   local:Motion.PlayWhen="{Binding IsMouseOver, ElementName=Logo}" />
+                    </Border>
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="電腦維護工具" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding VersionText}" Style="{StaticResource SubtleText}" FontSize="12" Margin="0,1,0,0" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom" Margin="22,6,16,10">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding ElevationGlyph}" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" />
+                        <TextBlock Text="{Binding ElevationText}" Style="{StaticResource SubtleText}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" />
+                        <TextBlock Text="{Binding SettingsText}" Style="{StaticResource SubtleText}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" AutomationProperties.Name="功能"
+                         Style="{StaticResource NavList}" ItemContainerStyle="{StaticResource NavItem}" />
+            </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Column="1">
+            <Border DockPanel.Dock="Top" Margin="28,16,28,0" Padding="14,8,8,8" CornerRadius="10" BorderThickness="1"
+                    Background="{StaticResource WarningSoftBrush}" BorderBrush="{StaticResource WarningLineBrush}"
+                    Visibility="{Binding ShowElevationBanner, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xEA18;" Style="{StaticResource IconText}" Foreground="{StaticResource WarningTextBrush}" Margin="2,0,10,0" />
+                    <Button DockPanel.Dock="Right" Content="以系統管理員重新啟動" Command="{Binding RestartElevatedCommand}"
+                            Style="{StaticResource SecondaryButton}" local:Glyph.Text="&#xEA18;" Margin="16,0,0,0" />
+                    <TextBlock Text="目前以一般權限執行，標示「需要系統管理員」的項目無法使用。" VerticalAlignment="Center"
+                               Foreground="{StaticResource WarningTextBrush}" TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
+            <Border DockPanel.Dock="Top" Margin="28,12,28,0" Padding="14,10" CornerRadius="10" BorderThickness="1"
+                    Background="{StaticResource DangerSoftBrush}" BorderBrush="{StaticResource DangerLineBrush}"
+                    Visibility="{Binding SettingsWarning, Converter={StaticResource TextToVisibility}}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}"
+                               VerticalAlignment="Top" Margin="2,1,10,0" />
+                    <TextBlock Text="{Binding SettingsWarning}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
+
+            <Grid Margin="28,18,28,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <!-- The open page's icon plays the page's own motion each time the page opens. -->
+                <DockPanel Margin="0,0,0,16" DataContext="{Binding SelectedPage}">
+                    <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="12" Background="{Binding TileBrush}"
+                            VerticalAlignment="Top" Margin="0,1,14,0" local:Motion.Kind="Pop" local:Motion.ReplayOn="{Binding}">
+                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource IconText}" FontSize="20" Foreground="White"
+                                   local:Motion.Kind="{Binding Motion}" local:Motion.ReplayOn="{Binding}" local:Motion.PlayOnLoad="True" />
+                    </Border>
+                    <StackPanel local:Motion.Kind="Entrance" local:Motion.ReplayOn="{Binding}">
+                        <TextBlock Text="{Binding Page.Title}" FontSize="22" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Page.Subtitle}" Style="{StaticResource SubtleText}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </DockPanel>
+                <ContentControl Grid.Row="1" Content="{Binding SelectedPage.Page}" Focusable="False"
+                                local:Motion.Kind="Entrance" local:Motion.ReplayOn="{Binding SelectedPage}" />
+            </Grid>
+        </DockPanel>
+    </Grid>
+</Window>

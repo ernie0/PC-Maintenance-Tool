@@ -1,0 +1,131 @@
+<Window x:Class="PcMaintenance.App.Views.MaintenanceProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PcMaintenance.App"
+        xmlns:vm="clr-namespace:PcMaintenance.App.ViewModels"
+        xmlns:controls="clr-namespace:PcMaintenance.App.Controls"
+        Title="一鍵維護進度" Width="480" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource TextBrush}"
+        FontFamily="Microsoft JhengHei UI" FontSize="14"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+    <StackPanel Margin="24,20,24,20">
+        <DockPanel>
+            <!-- The ring fills only with work actually done; the icon inside is the step being worked on and pops as each one starts. -->
+            <Grid DockPanel.Dock="Left" Width="64" Height="64" Margin="0,0,16,0" VerticalAlignment="Top">
+                <controls:RingGauge Thickness="5" TrackBrush="{StaticResource DividerBrush}" local:Motion.Value="{Binding RunProgress}">
+                    <controls:RingGauge.Style>
+                        <Style TargetType="controls:RingGauge">
+                            <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRunFinished}" Value="True">
+                                    <Setter Property="Stroke" Value="{StaticResource SuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsRunCancelled}" Value="True">
+                                    <Setter Property="Stroke" Value="{StaticResource ControlLineBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </controls:RingGauge.Style>
+                </controls:RingGauge>
+                <TextBlock FontSize="24" local:Motion.Kind="Pop" local:Motion.ReplayOn="{Binding RunDetail}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                            <Setter Property="Text" Value="{Binding CurrentStep.Glyph, FallbackValue=&#xEC4A;}" />
+                            <Setter Property="Foreground" Value="{Binding CurrentStep.TintBrush, FallbackValue={StaticResource AccentBrush}}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRunFinished}" Value="True">
+                                    <Setter Property="Text" Value="&#xE73E;" />
+                                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsRunCancelled}" Value="True">
+                                    <Setter Property="Text" Value="&#xE711;" />
+                                    <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{Binding RunTitle}" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding RunDetail}" Style="{StaticResource SubtleText}" Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite" />
+                <!-- Two lines are kept free while working, so the window does not jump as the text changes. -->
+                <TextBlock Text="{Binding ActivityText}" FontSize="13" Foreground="{StaticResource AccentBrush}" Margin="0,4,0,0"
+                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="36" ToolTip="{Binding ActivityText}"
+                           Visibility="{Binding IsRunFinished, Converter={StaticResource InverseBoolToVisibility}}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Margin="0,18,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="5">
+            <ItemsControl ItemsSource="{Binding RunSteps}" Focusable="False" AutomationProperties.Name="步驟">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:RunStep}">
+                        <Border x:Name="Row" CornerRadius="7" Padding="10,6">
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Left" Width="18" Height="18" Margin="0,0,10,0">
+                                    <Ellipse x:Name="Waiting" Width="9" Height="9" Stroke="{StaticResource ControlLineBrush}" StrokeThickness="1.5" />
+                                    <Ellipse x:Name="Spinner" Style="{StaticResource BusyRing}" Width="15" Height="15" Visibility="Collapsed" />
+                                    <TextBlock x:Name="Mark" Style="{StaticResource IconText}" FontSize="14" Visibility="Collapsed"
+                                               local:Motion.Kind="Pop" local:Motion.ReplayOn="{Binding State}" />
+                                </Grid>
+                                <TextBlock x:Name="Result" DockPanel.Dock="Right" Text="{Binding Text}" FontSize="13" Margin="12,0,0,0" MaxWidth="210"
+                                           Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Text}" />
+                                <TextBlock x:Name="StepName" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding State}" Value="Running">
+                                <Setter TargetName="Row" Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                <Setter TargetName="Waiting" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Spinner" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="StepName" Property="FontWeight" Value="SemiBold" />
+                                <Setter TargetName="Result" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Done">
+                                <Setter TargetName="Waiting" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Mark" Property="Text" Value="&#xE73E;" />
+                                <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                <Setter TargetName="Result" Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Found">
+                                <Setter TargetName="Waiting" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Mark" Property="Text" Value="&#xE946;" />
+                                <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Result" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Attention">
+                                <Setter TargetName="Waiting" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Mark" Property="Text" Value="&#xE7BA;" />
+                                <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource WarningTextBrush}" />
+                                <Setter TargetName="Result" Property="Foreground" Value="{StaticResource WarningTextBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Cancelled">
+                                <Setter TargetName="Waiting" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Mark" Property="Text" Value="&#xE711;" />
+                                <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource DisabledTextBrush}" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+
+        <DockPanel Margin="0,16,0,0">
+            <Grid DockPanel.Dock="Right">
+                <Button Content="取消" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" MinWidth="96" IsCancel="True"
+                        local:Glyph.Text="&#xE711;" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                <Button Content="關閉" Click="OnCloseClick" Style="{StaticResource PrimaryButton}" MinWidth="96"
+                        local:Glyph.Text="&#xE73E;" Visibility="{Binding IsBusy, Converter={StaticResource InverseBoolToVisibility}}" />
+            </Grid>
+            <TextBlock Text="關閉這個小視窗不會中止，進度也會顯示在主畫面。" Style="{StaticResource SubtleText}" FontSize="12"
+                       VerticalAlignment="Center" Margin="0,0,16,0"
+                       Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+        </DockPanel>
+    </StackPanel>
+</Window>

@@ -1,0 +1,168 @@
+<UserControl x:Class="PcMaintenance.App.Views.UninstallView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PcMaintenance.App"
+             xmlns:vm="clr-namespace:PcMaintenance.App.ViewModels">
+    <TabControl SelectedIndex="{Binding SelectedTab}">
+        <TabItem Header="桌面程式" local:Glyph.Text="&#xE71D;">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                    <Button DockPanel.Dock="Left" Content="解除安裝" Command="{Binding UninstallCommand}" Style="{StaticResource PrimaryButton}" MinWidth="104"
+                            local:Glyph.Text="&#xE74D;" local:Glyph.Motion="Bounce" local:Glyph.Busy="{Binding UninstallCommand.IsRunning}" />
+                    <Button DockPanel.Dock="Left" Content="重新檢查" Command="{Binding CheckAgainCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE9D9;" local:Glyph.Busy="{Binding CheckAgainCommand.IsRunning}"
+                            Visibility="{Binding HasPendingApp, Converter={StaticResource BoolToVisibility}}" />
+                    <Button DockPanel.Dock="Right" Content="重新整理" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshCommand.IsRunning}" />
+                    <TextBox DockPanel.Dock="Right" Width="260" Margin="0,0,12,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="搜尋程式名稱或發行者" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋程式" />
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Margin="0,0,0,10">
+                    <Button DockPanel.Dock="Right" Content="匯出清單" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge"
+                            Margin="16,0,0,0" ToolTip="把所有程式匯出成 CSV（可用 Excel 開啟），方便盤點各台電腦" />
+                    <TextBlock Text="{Binding CountText}" Style="{StaticResource SubtleText}" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Margin="16,0,0,0" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <ContentControl Grid.Row="2" Style="{StaticResource Card}">
+                    <DataGrid ItemsSource="{Binding Apps}" SelectedItem="{Binding SelectedApp}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="名稱" Width="2*" MinWidth="140" SortMemberPath="Name">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Right" Style="{StaticResource Chip}" Background="{StaticResource WarningSoftBrush}" Margin="8,0,0,0"
+                                                    Visibility="{Binding IsBroken, Converter={StaticResource BoolToVisibility}}"
+                                                    ToolTip="解除安裝程式已被刪除。按「解除安裝」可改為移除它留下的項目。">
+                                                <TextBlock Text="找不到解除安裝程式" FontSize="12" Foreground="{StaticResource WarningTextBrush}" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource CellText}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <!-- Only the date and size are fixed; the rest share what is left so names stay readable in a narrow window. -->
+                            <DataGridTextColumn Header="發行者" Binding="{Binding Publisher}" Width="1.1*" MinWidth="90" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="88" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="安裝日期" Binding="{Binding InstallDateText}" Width="100" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="大小" Binding="{Binding SizeText}" SortMemberPath="SizeSort" Width="84" ElementStyle="{StaticResource CellTextRight}" />
+                            <DataGridTextColumn Header="安裝範圍" Binding="{Binding Scope}" Width="1.2*" MinWidth="120" ElementStyle="{StaticResource CellText}" />
+                        </DataGrid.Columns>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Setter Property="ToolTip" Value="{Binding Name}" />
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+                </ContentControl>
+
+                <ContentControl Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,14"
+                                Visibility="{Binding ShowLeftoverPanel, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <Button DockPanel.Dock="Right" Content="移除已勾選的殘留" Command="{Binding RemoveLeftoversCommand}" Style="{StaticResource DangerButton}"
+                                    local:Glyph.Text="&#xE74D;" local:Glyph.Busy="{Binding RemoveLeftoversCommand.IsRunning}" />
+                            <TextBlock Text="{Binding LeftoverTitle}" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Leftovers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,1,0,0" Padding="0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,1,12,0"
+                                                          AutomationProperties.Name="{Binding PathText}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding KindText}" Style="{StaticResource SubtleText}" />
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{Binding PathText}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Reason}" Style="{StaticResource SubtleText}" FontSize="13" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding ResultText}" Foreground="{StaticResource DangerBrush}" FontSize="13" Margin="0,2,0,0"
+                                                               TextWrapping="Wrap" Visibility="{Binding ResultText, Converter={StaticResource TextToVisibility}}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" Margin="12,0,0,0" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </ContentControl>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="內建與商店 App" local:Glyph.Text="&#xE719;" local:Glyph.Motion="Bounce">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                    <Button DockPanel.Dock="Left" Content="勾選常見不需要的 App" Command="{Binding SelectCommonlyUnneededCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xE762;" />
+                    <Button DockPanel.Dock="Left" Content="移除已勾選的 App" Command="{Binding RemoveStoreAppsCommand}" Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE74D;" local:Glyph.Busy="{Binding RemoveStoreAppsCommand.IsRunning}" />
+                    <Button DockPanel.Dock="Right" Content="重新整理" Command="{Binding RefreshStoreAppsCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.Name="重新整理 App 清單"
+                            local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshStoreAppsCommand.IsRunning}" />
+                </DockPanel>
+                <TextBlock Grid.Row="1" Text="{Binding StoreStatus}" Style="{StaticResource SubtleText}" Margin="0,0,0,8" />
+                <Border Grid.Row="2" Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,8" Margin="0,0,0,10">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE946;" Style="{StaticResource IconText}" FontSize="15" Foreground="{StaticResource AccentBrush}"
+                                   VerticalAlignment="Top" Margin="0,1,10,0" />
+                        <TextBlock Text="只會為目前使用者移除，之後可以從 Microsoft Store 重新安裝。Windows 必要的元件（商店、語言套件、開始功能表等）不會列出。"
+                                   TextWrapping="Wrap" FontSize="13" />
+                    </DockPanel>
+                </Border>
+                <ContentControl Grid.Row="3" Style="{StaticResource Card}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding StoreAppRows}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:StoreAppRow}">
+                                    <Border BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" Padding="14,8">
+                                        <DockPanel>
+                                            <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                      AutomationProperties.Name="{Binding App.DisplayName}" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding App.Version}" Style="{StaticResource SubtleText}" FontSize="13"
+                                                       VerticalAlignment="Center" Margin="12,0,0,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding App.DisplayName}" FontWeight="SemiBold" />
+                                                    <Border Style="{StaticResource Chip}" Background="{StaticResource WarningSoftBrush}" Margin="8,0,0,0"
+                                                            Visibility="{Binding App.IsCommonlyUnneeded, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="常見不需要" FontSize="12" Foreground="{StaticResource WarningTextBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding App.Publisher}" Style="{StaticResource SubtleText}" FontSize="13" Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding ResultText}" Foreground="{StaticResource DangerBrush}" FontSize="13" Margin="0,2,0,0"
+                                                           TextWrapping="Wrap" Visibility="{Binding ResultText, Converter={StaticResource TextToVisibility}}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </ContentControl>
+            </Grid>
+        </TabItem>
+    </TabControl>
+</UserControl>

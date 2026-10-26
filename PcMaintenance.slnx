@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PcMaintenance.App/PcMaintenance.App.csproj" />
+    <Project Path="src/PcMaintenance.Core/PcMaintenance.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PcMaintenance.Core.Tests/PcMaintenance.Core.Tests.csproj" />
+  </Folder>
+</Solution>
