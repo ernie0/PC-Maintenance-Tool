@@ -9,7 +9,9 @@ public sealed class FileLog(string directory)
 
     public void Info(string message) => Write("INFO", message);
     public void Warn(string message) => Write("WARN", message);
-    public void Error(string message, Exception? ex = null) => Write("ERROR", ex is null ? message : $"{message}：{ex.Message}");
+    /// <summary>With the exception's type and stack, so an error reported from another PC can be traced to the line that failed.</summary>
+    public void Error(string message, Exception? ex = null) =>
+        Write("ERROR", ex is null ? message : $"{message}：{ex.GetType().Name}：{ex.Message}{Environment.NewLine}{ex.StackTrace}");
 
     private void Write(string level, string message)
     {

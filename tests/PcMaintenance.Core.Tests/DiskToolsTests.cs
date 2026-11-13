@@ -18,6 +18,18 @@ public class DiskToolsTests
         Assert.Null(disk.Reliability);
     }
 
+    [Fact]
+    public void Asking_for_reliability_still_lists_the_disks()
+    {
+        // 0.3.1 queried the disks without their key, so GetRelated threw before even asking Windows and the elevated
+        // disk tools page stayed empty. Without elevation the counters are refused, but the disks must still be there.
+        var inventory = DiskInventory.Read(includeReliability: true);
+
+        Assert.Null(inventory.Error);
+        Assert.NotEmpty(inventory.Disks);
+        Assert.Contains(inventory.Volumes, v => v.IsSystem);
+    }
+
     [Theory]
     [InlineData(0, DiskJobOutcome.Ok)]
     [InlineData(2, DiskJobOutcome.Ok)]

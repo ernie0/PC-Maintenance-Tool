@@ -40,8 +40,9 @@ public static class DiskInventory
                     }
                 }
             }
+            // ObjectId is the key: without it the objects have no path and GetRelated (reliability) cannot be called on them.
             using (var searcher = new ManagementObjectSearcher(StorageNamespace,
-                       "SELECT DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus FROM MSFT_PhysicalDisk"))
+                       "SELECT ObjectId, DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus FROM MSFT_PhysicalDisk"))
             using (var results = searcher.Get())
             {
                 foreach (var item in results.Cast<ManagementObject>())
@@ -101,7 +102,8 @@ public static class DiskInventory
                 }
             }
         }
-        catch (Exception ex) when (ex is ManagementException or COMException or UnauthorizedAccessException)
+        // The counters are extra detail: a disk that cannot report them still shows its health and space.
+        catch (Exception ex) when (ex is ManagementException or COMException or UnauthorizedAccessException or InvalidOperationException)
         {
         }
         return null;
