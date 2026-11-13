@@ -19,4 +19,13 @@ public static class ByteSize
         var format = value >= 100 ? "0" : "0.0";
         return $"{value.ToString(format, CultureInfo.InvariantCulture)} {Units[unit]}";
     }
+
+    /// <summary>Network speed the way Task Manager and internet providers state it: 12.3 Mbps.</summary>
+    public static string FormatBitsPerSecond(double bitsPerSecond) => bitsPerSecond switch
+    {
+        < 1_000 => $"{bitsPerSecond.ToString("0", CultureInfo.InvariantCulture)} bps",
+        < 1_000_000 => $"{(bitsPerSecond / 1_000).ToString("0.#", CultureInfo.InvariantCulture)} Kbps",
+        < 1_000_000_000 => $"{(bitsPerSecond / 1_000_000).ToString("0.#", CultureInfo.InvariantCulture)} Mbps",
+        _ => $"{(bitsPerSecond / 1_000_000_000).ToString("0.##", CultureInfo.InvariantCulture)} Gbps",
+    };
 }

@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:PcMaintenance.App"
              xmlns:controls="clr-namespace:PcMaintenance.App.Controls">
     <UserControl.Resources>
-        <!-- Kind values come from the view model: cpu, memory, disk, network, gpu. -->
+        <!-- Kind values come from the view model: cpu, memory, disk, network, gpu, and download / upload in the network tab. -->
         <Style x:Key="ResourceChart" TargetType="controls:Sparkline">
             <Setter Property="Stroke" Value="#2563EB" />
             <Style.Triggers>
@@ -15,6 +15,9 @@
                     <Setter Property="Stroke" Value="#16A34A" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="network">
+                    <Setter Property="Stroke" Value="#D97706" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="upload">
                     <Setter Property="Stroke" Value="#D97706" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="gpu">
@@ -180,12 +183,14 @@
                     <ListBox DockPanel.Dock="Left" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" DisplayMemberPath="Label"
                              Style="{StaticResource SegmentList}" ItemContainerStyle="{StaticResource SegmentItem}" AutomationProperties.Name="網路檢視" />
                     <Button DockPanel.Dock="Right" Content="匯出清單" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                            local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="把目前檢視的完整清單（含本機內部連線）匯出成 CSV（可用 Excel 開啟）" />
+                            local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="把目前檢視的完整清單（含本機內部連線）匯出成 CSV（可用 Excel 開啟）"
+                            Visibility="{Binding HasAddresses, Converter={StaticResource BoolToVisibility}}" />
                     <Button DockPanel.Dock="Right" Content="查詢主機名稱" Command="{Binding LookupHostNamesCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                             local:Glyph.Text="&#xE774;" local:Glyph.Busy="{Binding LookupHostNamesCommand.IsRunning}"
-                            ToolTip="向這台電腦設定的 DNS 伺服器查詢畫面上各位址的名稱；不按就不會查詢" />
-                    <Button DockPanel.Dock="Right" Content="開啟檔案位置" Command="{Binding OpenLocationCommand}" Style="{StaticResource SecondaryButton}"
-                            local:Glyph.Text="&#xE838;" Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}" />
+                            ToolTip="向這台電腦設定的 DNS 伺服器查詢畫面上各位址的名稱；不按就不會查詢"
+                            Visibility="{Binding HasAddresses, Converter={StaticResource BoolToVisibility}}" />
+                    <Button DockPanel.Dock="Right" Content="開啟檔案位置" Command="{Binding OpenLocationCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE838;" Visibility="{Binding CanShowLocation, Converter={StaticResource BoolToVisibility}}" />
                 </DockPanel>
 
                 <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
@@ -242,6 +247,57 @@
                                 </Style>
                             </DataGrid.RowStyle>
                         </DataGrid>
+                        <!-- Program traffic: the speed of everything (or of the chosen program) over two minutes, then every program. -->
+                        <Grid DataContext="{Binding Traffic}" Visibility="{Binding DataContext.IsTraffic, RelativeSource={RelativeSource AncestorType=ContentControl}, Converter={StaticResource BoolToVisibility}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Margin="16,12,16,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.ColumnSpan="3" Text="{Binding ChartTitle, StringFormat=最近 2 分鐘：{0}}" Style="{StaticResource SubtleText}" FontSize="12"
+                                           TextTrimming="CharacterEllipsis" Margin="0,0,0,6" />
+                                <StackPanel Grid.Row="1" DataContext="{Binding Download}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding ScaleText}" Style="{StaticResource SubtleText}" FontSize="12" />
+                                        <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" />
+                                    </DockPanel>
+                                    <controls:Sparkline Height="56" Margin="0,4,0,0" Values="{Binding History}" Maximum="{Binding Maximum}" Capacity="{Binding Capacity}"
+                                                        GridBrush="{StaticResource DividerBrush}" Style="{StaticResource ResourceChart}" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="2" DataContext="{Binding Upload}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding ScaleText}" Style="{StaticResource SubtleText}" FontSize="12" />
+                                        <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" />
+                                    </DockPanel>
+                                    <controls:Sparkline Height="56" Margin="0,4,0,0" Values="{Binding History}" Maximum="{Binding Maximum}" Capacity="{Binding Capacity}"
+                                                        GridBrush="{StaticResource DividerBrush}" Style="{StaticResource ResourceChart}" />
+                                </StackPanel>
+                            </Grid>
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding ProgramView}" SelectedItem="{Binding SelectedProgram}" EnableRowVirtualization="True"
+                                      AutomationProperties.Name="程式流量">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="程式" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CellText}" />
+                                    <DataGridTextColumn Header="下載速度" Binding="{Binding DownloadRateText}" SortMemberPath="DownloadRate" Width="120" ElementStyle="{StaticResource CellTextRight}" />
+                                    <DataGridTextColumn Header="上傳速度" Binding="{Binding UploadRateText}" SortMemberPath="UploadRate" Width="120" ElementStyle="{StaticResource CellTextRight}" />
+                                    <DataGridTextColumn Header="已下載" Binding="{Binding DownloadedText}" SortMemberPath="Downloaded" Width="96" ElementStyle="{StaticResource CellTextRight}" />
+                                    <DataGridTextColumn Header="已上傳" Binding="{Binding UploadedText}" SortMemberPath="Uploaded" Width="96" ElementStyle="{StaticResource CellTextRight}" />
+                                </DataGrid.Columns>
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                    </Style>
+                                </DataGrid.RowStyle>
+                            </DataGrid>
+                        </Grid>
                         <DataGrid ItemsSource="{Binding DeviceView}" EnableRowVirtualization="True" AutomationProperties.Name="區域網路裝置"
                                   Visibility="{Binding IsDevices, Converter={StaticResource BoolToVisibility}}">
                             <DataGrid.Columns>

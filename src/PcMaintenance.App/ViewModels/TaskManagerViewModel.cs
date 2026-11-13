@@ -342,13 +342,7 @@ public sealed partial class TaskManagerViewModel : PageViewModel
 
     private static string Kilobytes(int kilobytes) => kilobytes >= 1024 ? $"{kilobytes / 1024.0:0.#} MB" : $"{kilobytes} KB";
 
-    private static string Bits(double bitsPerSecond) => bitsPerSecond switch
-    {
-        < 1_000 => $"{bitsPerSecond:0} bps",
-        < 1_000_000 => $"{bitsPerSecond / 1_000:0.#} Kbps",
-        < 1_000_000_000 => $"{bitsPerSecond / 1_000_000:0.#} Mbps",
-        _ => $"{bitsPerSecond / 1_000_000_000:0.##} Gbps",
-    };
+    private static string Bits(double bitsPerSecond) => ByteSize.FormatBitsPerSecond(bitsPerSecond);
 
     private sealed record Snapshot(
         IReadOnlyList<ProcessSample> Processes, IReadOnlyDictionary<(int Id, long CreateTime), double> Cpu,

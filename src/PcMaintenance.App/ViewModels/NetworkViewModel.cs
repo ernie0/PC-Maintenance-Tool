@@ -26,12 +26,14 @@ public sealed record NetworkSection(string Label)
 }
 
 /// <summary>
-/// The network tab of the task manager: which program talks to which address, and the devices on the local network
-/// this PC talked to. Everything comes from Windows' own tables; nothing is sent unless the user asks for host names.
+/// The network tab of the task manager: which program talks to which address, how much each program sends and
+/// receives (elevated only), and the devices on the local network this PC talked to. Everything comes from Windows'
+/// own tables and events; nothing is sent unless the user asks for host names.
 /// </summary>
 public sealed partial class NetworkViewModel : ObservableObject
 {
     public static readonly NetworkSection ConnectionsSection = new("連線");
+    public static readonly NetworkSection TrafficSection = new("程式流量");
     public static readonly NetworkSection DevicesSection = new("區域網路裝置");
 
     private readonly AppServices _services;
@@ -44,6 +46,7 @@ public sealed partial class NetworkViewModel : ObservableObject
     private SuspiciousListLoad? _suspicious;
     private bool _active;
     private bool _sampling;
+    private string? _trafficProblem;
 
     public NetworkViewModel(AppServices services, ProcessNames names)
     {
@@ -62,10 +65,16 @@ public sealed partial class NetworkViewModel : ObservableObject
         ConnectionView.SortDescriptions.Add(new SortDescription(nameof(ConnectionRow.AddressText), ListSortDirection.Ascending));
         DeviceView = new ListCollectionView(Devices) { Filter = item => item is DeviceRow row && row.Matches(SearchText.Trim()) };
         DeviceView.SortDescriptions.Add(new SortDescription(nameof(DeviceRow.SortKey), ListSortDirection.Ascending));
+        Traffic = new ProgramTrafficViewModel(services);
+        Traffic.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ProgramTrafficViewModel.SelectedProgram)) OpenLocationCommand.NotifyCanExecuteChanged();
+        };
         _timer.Tick += async (_, _) => await RefreshAsync();
     }
 
-    public IReadOnlyList<NetworkSection> Sections { get; } = [ConnectionsSection, DevicesSection];
+    public IReadOnlyList<NetworkSection> Sections { get; } = [ConnectionsSection, TrafficSection, DevicesSection];
+    public ProgramTrafficViewModel Traffic { get; }
     public ObservableCollection<NetworkFilter> Filters { get; }
     public ObservableCollection<ConnectionRow> Connections { get; } = [];
     public ListCollectionView ConnectionView { get; }
@@ -73,7 +82,7 @@ public sealed partial class NetworkViewModel : ObservableObject
     public ListCollectionView DeviceView { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDevices), nameof(IsConnections), nameof(SearchHint))]
+    [NotifyPropertyChangedFor(nameof(IsDevices), nameof(IsConnections), nameof(IsTraffic), nameof(HasAddresses), nameof(CanShowLocation), nameof(SearchHint))]
     [NotifyCanExecuteChangedFor(nameof(OpenLocationCommand))]
     private NetworkSection _selectedSection = ConnectionsSection;
 
@@ -105,8 +114,12 @@ public sealed partial class NetworkViewModel : ObservableObject
     private string _statusText = "";
 
     public bool IsDevices => SelectedSection == DevicesSection;
-    public bool IsConnections => !IsDevices;
-    public string SearchHint => IsDevices ? "搜尋 IP、實體位址或名稱" : "搜尋程式、位址、服務或名稱";
+    public bool IsTraffic => SelectedSection == TrafficSection;
+    public bool IsConnections => SelectedSection == ConnectionsSection;
+    /// <summary>Host names and the export apply to lists of addresses, not to the traffic view.</summary>
+    public bool HasAddresses => !IsTraffic;
+    public bool CanShowLocation => !IsDevices;
+    public string SearchHint => IsDevices ? "搜尋 IP、實體位址或名稱" : IsTraffic ? "搜尋程式" : "搜尋程式、位址、服務或名稱";
 
     public string DetailText => SelectedConnection is not { } row ? "" :
         (row.Info.IsClosed ? "程式已關閉的連線（Windows 會在幾分鐘內自動清除）" : $"{row.ProgramName}（處理程序 {row.ProcessId}）") +
@@ -123,6 +136,9 @@ public sealed partial class NetworkViewModel : ObservableObject
 
     partial void OnSelectedSectionChanged(NetworkSection value)
     {
+        // A lookup or export result is about the view it was made in.
+        StatusText = "";
+        UpdateTraffic();
         UpdateTexts();
         _ = RefreshAsync();
     }
@@ -138,6 +154,7 @@ public sealed partial class NetworkViewModel : ObservableObject
     {
         ConnectionView.Refresh();
         DeviceView.Refresh();
+        Traffic.ApplySearch(value);
     }
 
     /// <summary>Samples every 2 seconds while the tab is on screen; the company's suspicious list is read again each time it opens.</summary>
@@ -145,6 +162,7 @@ public sealed partial class NetworkViewModel : ObservableObject
     {
         if (active == _active) return;
         _active = active;
+        UpdateTraffic();
         if (!active)
         {
             _timer.Stop();
@@ -153,6 +171,13 @@ public sealed partial class NetworkViewModel : ObservableObject
         _suspicious = null;
         _timer.Start();
         _ = RefreshAsync();
+    }
+
+    /// <summary>Traffic is counted only while its view is on screen, so the ETW session never outlives it.</summary>
+    private void UpdateTraffic()
+    {
+        if (_active && IsTraffic) _trafficProblem = Traffic.Start();
+        else Traffic.Stop();
     }
 
     [RelayCommand]
@@ -198,10 +223,12 @@ public sealed partial class NetworkViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanOpenLocation))]
     private void OpenLocation()
     {
-        if (SelectedConnection?.Info.ProgramPath is { } path) Shell.ShowInExplorer(path);
+        if (SelectedProgramPath is { } path) Shell.ShowInExplorer(path);
     }
 
-    private bool CanOpenLocation() => IsConnections && SelectedConnection?.Info.ProgramPath is not null;
+    private bool CanOpenLocation() => SelectedProgramPath is not null;
+
+    private string? SelectedProgramPath => IsConnections ? SelectedConnection?.Info.ProgramPath : IsTraffic ? Traffic.SelectedProgram?.Path : null;
 
     private bool IsShown(ConnectionRow row) =>
         (ShowInternalAndClosed || !IsBackground(row)) && SelectedFilter.Matches(row) && row.Matches(SearchText.Trim());
@@ -215,16 +242,21 @@ public sealed partial class NetworkViewModel : ObservableObject
         try
         {
             var devices = IsDevices;
+            var traffic = IsTraffic;
             var settings = _services.Settings;
             var snapshot = await Task.Run(() =>
             {
                 var suspicious = _suspicious ?? SuspiciousAddressList.Load(settings);
-                var connections = ConnectionInventory.Describe(ConnectionTable.Read(), ProcessSnapshot.ReadAll(), _names, suspicious.List);
-                return (suspicious, connections, devices ? NeighborTable.Read() : null);
+                var processes = ProcessSnapshot.ReadAll();
+                var connections = ConnectionInventory.Describe(ConnectionTable.Read(), processes, _names, suspicious.List);
+                var counts = traffic ? Traffic.Snapshot() : null;
+                var identities = counts is null ? null : processes.Where(p => counts.ContainsKey(p.Id)).ToDictionary(p => p.Id, _names.Get);
+                return (suspicious, connections, devices ? NeighborTable.Read() : null, counts, identities);
             });
             _suspicious = snapshot.suspicious;
             ApplyConnections(snapshot.connections);
             if (snapshot.Item3 is { } neighbors) ApplyDevices(neighbors);
+            if (IsTraffic && snapshot.counts is { } counts && snapshot.identities is { } identities) Traffic.Apply(counts, identities);
             UpdateTexts();
         }
         catch (Win32Exception ex)
@@ -311,6 +343,12 @@ public sealed partial class NetworkViewModel : ObservableObject
 
     private void UpdateTexts()
     {
+        if (IsTraffic)
+        {
+            CountText = Traffic.SummaryText;
+            NoteText = _trafficProblem ?? Traffic.StatusText;
+            return;
+        }
         if (IsDevices)
         {
             CountText = $"裝置 {Devices.Count:N0} 台";
