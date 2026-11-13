@@ -77,6 +77,15 @@ public sealed class ToolsViewModel : PageViewModel
                 Confirm = "重設後需要重新開機才會生效。確定要重設嗎？",
             },
             new("備份驅動程式", "把這台電腦安裝的第三方驅動程式匯出到資料夾，重灌 Windows 後可以用來安裝。", "", BackupDrivers) { NeedsAdmin = true },
+            .. PacketMonitorExists()
+                ? [new ToolItem("擷取網路封包", "交給資訊人員分析網路問題時使用：擷取最多 5 分鐘的封包，存成 Wireshark 可以開啟的檔案。",
+                    "", CapturePackets)
+                {
+                    NeedsAdmin = true,
+                    Confirm = "會用 Windows 內建的封包監視器擷取這台電腦所有網路卡的封包，最多 5 分鐘（在命令視窗按任意鍵可以提早結束），存到「文件\\網路封包擷取」。\n\n" +
+                              "擷取檔包含這段時間所有進出這台電腦的網路內容（含未加密的資料與網址），請只交給需要分析的資訊人員，用完就刪除。確定要開始嗎？",
+                }]
+                : Array.Empty<ToolItem>(),
         ];
         QuickFixes =
         [
@@ -186,6 +195,31 @@ public sealed class ToolsViewModel : PageViewModel
         var target = Path.Combine(dialog.FolderName, $"驅動程式備份-{Environment.MachineName}-{DateTime.Now:yyyyMMdd}");
         Directory.CreateDirectory(target);
         return RunInConsole("備份驅動程式", $"pnputil /export-driver * \"{target}\"&echo.&echo 備份位置：{target}");
+    }
+
+    // Packet Monitor ships with Windows 10 2004 and later.
+    private static bool PacketMonitorExists() => File.Exists(Path.Combine(Environment.SystemDirectory, "PktMon.exe"));
+
+    /// <summary>
+    /// pktmon at the network cards only (so no packet is logged twice), whole packets, the newest 200 MB at most; then
+    /// converted to pcapng. The file goes to this user's Documents even when another account approves the elevation.
+    /// </summary>
+    private static Task<string?> CapturePackets()
+    {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "網路封包擷取");
+        Directory.CreateDirectory(folder);
+        var name = $"網路封包-{Environment.MachineName}-{DateTime.Now:yyyyMMdd-HHmmss}";
+        var etl = Path.Combine(folder, name + ".etl");
+        var pcap = Path.Combine(folder, name + ".pcapng");
+        var commands = string.Join("&",
+            "echo 正在擷取網路封包：最多 5 分鐘，檔案只保留最近 200 MB；要提早結束請按任意鍵。",
+            "echo 擷取檔包含這段時間所有進出這台電腦的網路內容，請只交給需要分析的資訊人員。",
+            "echo.",
+            $"pktmon start --capture --comp nics --pkt-size 0 --file-name \"{etl}\" --file-size 200 >nul" +
+            $" && (timeout /t 300 & echo. & pktmon stop &pktmon etl2pcap \"{etl}\" --out \"{pcap}\" & del \"{etl}\" & echo." +
+            $" & echo 已存成 {pcap}，可以用 Wireshark 開啟。 & start \"\" explorer /select,\"{pcap}\")" +
+            " || echo 無法開始擷取：可能已有其他封包擷取在進行（例如上次擷取時直接關掉了視窗），請在這個視窗輸入 pktmon stop 後再試一次。");
+        return RunInConsole("擷取網路封包", commands);
     }
 
     private async Task<string?> RebuildIconCacheAsync()
