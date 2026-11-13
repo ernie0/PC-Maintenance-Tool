@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -23,20 +22,21 @@ public sealed partial class TaskManagerViewModel : PageViewModel
     private readonly AppServices _services;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly int _session;
+    private readonly ProcessNames _names = new();
     // Sampling state below is only touched by Collect, which never runs twice at once.
     private readonly ProcessCpuTracker _processCpu = new();
-    private readonly ConcurrentDictionary<(int, long), (string Name, string? Path)> _identities = new();
-    private readonly Dictionary<string, string?> _descriptions = new(StringComparer.OrdinalIgnoreCase);
     private PerformanceSampler? _performance;
     private ComputerInfo? _hardware;
     // UI state.
     private readonly Dictionary<(int, long), ProcessRow> _rows = [];
     private readonly Dictionary<string, PerfResource> _resources = [];
     private bool _sampling;
+    private bool _visible;
 
     public TaskManagerViewModel(AppServices services)
     {
         _services = services;
+        Network = new NetworkViewModel(services, _names);
         using (var self = Process.GetCurrentProcess()) _session = self.SessionId;
         ProcessView = new ListCollectionView(Processes) { Filter = MatchesSearch };
         ProcessView.SortDescriptions.Add(new SortDescription(nameof(ProcessRow.MemoryBytes), ListSortDirection.Descending));
@@ -49,11 +49,16 @@ public sealed partial class TaskManagerViewModel : PageViewModel
     public override string Title => "工作管理員";
 
     public override string Subtitle =>
-        "即時查看執行中的程式與電腦效能，可結束沒有回應的程式。Windows 必要的處理程序與系統服務不提供結束，服務請到「開機與背景」管理。";
+        "即時查看執行中的程式、電腦效能與網路連線，可結束沒有回應的程式。Windows 必要的處理程序與系統服務不提供結束，服務請到「開機與背景」管理。";
 
     public ObservableCollection<ProcessRow> Processes { get; } = [];
     public ListCollectionView ProcessView { get; }
     public ObservableCollection<PerfResource> Resources { get; } = [];
+    public NetworkViewModel Network { get; }
+
+    /// <summary>0 processes, 1 performance, 2 network; the network tab only samples while it is shown.</summary>
+    [ObservableProperty]
+    private int _selectedTab;
 
     [ObservableProperty]
     private string _searchText = "";
@@ -76,13 +81,22 @@ public sealed partial class TaskManagerViewModel : PageViewModel
 
     partial void OnSearchTextChanged(string value) => ProcessView.Refresh();
 
+    partial void OnSelectedTabChanged(int value) => Network.SetActive(_visible && value == 2);
+
     public override void OnNavigatedTo()
     {
+        _visible = true;
         _timer.Start();
         _ = SampleAsync();
+        Network.SetActive(SelectedTab == 2);
     }
 
-    public override void OnNavigatedFrom() => _timer.Stop();
+    public override void OnNavigatedFrom()
+    {
+        _visible = false;
+        _timer.Stop();
+        Network.SetActive(false);
+    }
 
     [RelayCommand(CanExecute = nameof(CanEnd))]
     private async Task EndProcessAsync()
@@ -138,9 +152,8 @@ public sealed partial class TaskManagerViewModel : PageViewModel
         // Id 0 is the idle process: its "CPU" is the unused time.
         var processes = ProcessSnapshot.ReadAll().Where(p => p.Id != 0).ToList();
         var cpu = _processCpu.Update(processes, timestamp);
-        var alive = processes.Select(p => p.Key).ToHashSet();
-        foreach (var process in processes) _identities.GetOrAdd(process.Key, _ => Identify(process));
-        foreach (var gone in _identities.Keys.Where(k => !alive.Contains(k)).ToList()) _identities.TryRemove(gone, out _);
+        foreach (var process in processes) _names.Get(process);
+        _names.KeepOnly(processes);
 
         _hardware ??= SystemInfoReader.Read();
         _performance ??= new PerformanceSampler(_hardware.Processor.BaseMHz);
@@ -152,15 +165,6 @@ public sealed partial class TaskManagerViewModel : PageViewModel
         return new Snapshot(processes, cpu, performance, _hardware);
     }
 
-    private (string Name, string? Path) Identify(ProcessSample process)
-    {
-        var path = ProcessSnapshot.ExecutablePath(process.Id);
-        string? description = null;
-        if (path is not null && !_descriptions.TryGetValue(path, out description))
-            _descriptions[path] = description = ProcessSnapshot.Describe(path);
-        return (description ?? Path.GetFileNameWithoutExtension(process.ImageName), path);
-    }
-
     private void Apply(Snapshot snapshot)
     {
         var seen = new HashSet<(int, long)>();
@@ -169,7 +173,7 @@ public sealed partial class TaskManagerViewModel : PageViewModel
             seen.Add(process.Key);
             if (!_rows.TryGetValue(process.Key, out var row))
             {
-                var (name, path) = _identities.TryGetValue(process.Key, out var identity) ? identity : (process.ImageName, null);
+                var (name, path) = _names.TryGet(process.Key, out var identity) ? identity : (process.ImageName, null);
                 row = new ProcessRow(process, name, path, ProcessControl.WhyNotEnd(process, _session, Environment.ProcessId));
                 _rows[process.Key] = row;
                 Processes.Add(row);

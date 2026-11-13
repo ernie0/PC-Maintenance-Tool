@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Net;
 using PcMaintenance.Core.Common;
+using PcMaintenance.Core.Network;
 using PcMaintenance.Core.Startup;
 using PcMaintenance.Core.SystemInfo;
 using PcMaintenance.Core.Uninstall;
@@ -12,6 +14,8 @@ public static class InventoryExport
     public const string SoftwareKind = "軟體清單";
     public const string StartupKind = "開機項目";
     public const string SystemKind = "電腦配備";
+    public const string ConnectionsKind = "網路連線";
+    public const string DevicesKind = "區域網路裝置";
 
     public static string DefaultFileName(string kind, string computerName, DateTime now) => $"{kind}-{computerName}-{now:yyyyMMdd}.csv";
 
@@ -52,6 +56,44 @@ public static class InventoryExport
             i.IsMicrosoft ? "是" : "否",
         }).ToList();
         CsvFile.Write(path, ["電腦名稱", "名稱", "類型", "狀態", "發行者", "命令", "位置", "Microsoft 項目"], rows);
+        return rows.Count;
+    }
+
+    /// <summary>Every connection, loopback ones included; host names are filled in only when the user looked them up.</summary>
+    public static int WriteConnections(string path, IEnumerable<ConnectionInfo> connections, string computerName, Func<IPAddress, string?>? hostName = null)
+    {
+        var rows = connections.Select(c => new[]
+        {
+            computerName,
+            c.ProgramName,
+            c.Connection.ProcessId.ToString(CultureInfo.InvariantCulture),
+            c.ProgramPath ?? "",
+            ConnectionText.Protocol(c.Connection.Protocol),
+            ConnectionText.Endpoint(c.Connection.Local),
+            c.Connection.Remote is { } remote ? ConnectionText.Endpoint(remote) : "",
+            c.RemoteAddress is { } address ? hostName?.Invoke(address) ?? "" : "",
+            ConnectionText.State(c.Connection),
+            c.Service?.Text ?? "",
+            ConnectionText.Scope(c),
+            c.IsSuspicious ? "是" : "否",
+        }).ToList();
+        CsvFile.Write(path, ["電腦名稱", "程式", "處理程序編號", "程式路徑", "協定", "本機位址", "遠端位址", "主機名稱", "狀態", "服務", "範圍", "可疑 IP"], rows);
+        return rows.Count;
+    }
+
+    public static int WriteDevices(string path, IEnumerable<NeighborDevice> devices, string computerName, Func<IPAddress, string?>? hostName = null)
+    {
+        var rows = devices.Select(d => new[]
+        {
+            computerName,
+            d.Address.ToString(),
+            hostName?.Invoke(d.Address) ?? "",
+            d.Mac,
+            d.AdapterName,
+            d.IsStatic ? "手動設定" : "自動學習",
+            d.IsGateway ? "是" : "否",
+        }).ToList();
+        CsvFile.Write(path, ["電腦名稱", "IP 位址", "主機名稱", "實體位址", "網路卡", "類型", "預設閘道"], rows);
         return rows.Count;
     }
 

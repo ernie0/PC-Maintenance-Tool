@@ -3,6 +3,7 @@ using PcMaintenance.Core.Common;
 using PcMaintenance.Core.Inventory;
 using PcMaintenance.Core.Junk;
 using PcMaintenance.Core.Maintenance;
+using PcMaintenance.Core.Network;
 using PcMaintenance.Core.Startup;
 using PcMaintenance.Core.SystemInfo;
 using PcMaintenance.Core.Uninstall;
@@ -44,6 +45,12 @@ public static class CommandRunner
                 {
                     InventoryExport.WriteSystem(target, SystemInfoReader.Read(), DateTime.Now);
                     return 1;
+                }),
+                CliAction.ExportConnections => Export(command.Path!, InventoryExport.ConnectionsKind, log, target =>
+                {
+                    var suspicious = SuspiciousAddressList.Load(services.Settings);
+                    if (suspicious.Error is { } listError) log.Warn(listError);
+                    return InventoryExport.WriteConnections(target, ConnectionInventory.ReadCurrent(suspicious.List), Environment.MachineName);
                 }),
                 CliAction.RestorePoint => CreateRestorePoint(services),
                 _ => InvalidArguments,

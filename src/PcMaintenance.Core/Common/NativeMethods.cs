@@ -175,6 +175,23 @@ internal static class NativeMethods
 
     [DllImport("pdh.dll")]
     internal static extern int PdhCloseQuery(IntPtr hQuery);
+
+    internal const int AF_INET = 2;
+    internal const int AF_INET6 = 23;
+    internal const int TCP_TABLE_OWNER_PID_ALL = 5;
+    internal const int UDP_TABLE_OWNER_PID = 1;
+    internal const uint ERROR_INSUFFICIENT_BUFFER = 122;
+    internal const uint ERROR_NO_DATA = 232;
+
+    // The tables are a DWORD entry count followed by the rows; the rows are read by offset in ConnectionTable.
+    [DllImport("iphlpapi.dll")]
+    internal static extern uint GetExtendedTcpTable(IntPtr pTcpTable, ref int pdwSize, [MarshalAs(UnmanagedType.Bool)] bool bOrder, int ulAf, int tableClass, uint reserved);
+
+    [DllImport("iphlpapi.dll")]
+    internal static extern uint GetExtendedUdpTable(IntPtr pUdpTable, ref int pdwSize, [MarshalAs(UnmanagedType.Bool)] bool bOrder, int ulAf, int tableClass, uint reserved);
+
+    [DllImport("iphlpapi.dll")]
+    internal static extern uint GetIpNetTable(IntPtr pIpNetTable, ref int pdwSize, [MarshalAs(UnmanagedType.Bool)] bool bOrder);
 }
 
 public static class BackgroundMode

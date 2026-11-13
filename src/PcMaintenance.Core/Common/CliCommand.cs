@@ -8,6 +8,7 @@ public enum CliAction
     ExportSoftware,
     ExportStartup,
     ExportSystem,
+    ExportConnections,
     RestorePoint,
 }
 
@@ -21,6 +22,7 @@ public sealed record CliCommand(CliAction Action, bool DryRun = false, string? P
           --export-software <檔案或資料夾>      匯出軟體清單（CSV）
           --export-startup <檔案或資料夾>       匯出開機與背景項目（CSV）
           --export-system <檔案或資料夾>        匯出電腦配備與系統版本（CSV）
+          --export-connections <檔案或資料夾>   匯出目前的網路連線與所屬程式（CSV；不查主機名稱）
           --restore-point                      建立系統還原點（需要系統管理員權限）
         """;
 
@@ -45,13 +47,14 @@ public sealed record CliCommand(CliAction Action, bool DryRun = false, string? P
                 "--export-software" => CliAction.ExportSoftware,
                 "--export-startup" => CliAction.ExportStartup,
                 "--export-system" => CliAction.ExportSystem,
+                "--export-connections" => CliAction.ExportConnections,
                 "--restore-point" => CliAction.RestorePoint,
                 _ => CliAction.None,
             };
             if (next == CliAction.None) return Fail($"無法辨識的參數：{args[i]}");
             if (action != CliAction.None) return Fail("一次只能指定一個動作");
             action = next;
-            if (action is CliAction.ExportSoftware or CliAction.ExportStartup or CliAction.ExportSystem)
+            if (action is CliAction.ExportSoftware or CliAction.ExportStartup or CliAction.ExportSystem or CliAction.ExportConnections)
             {
                 if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal))
                     return Fail($"{args[i]} 後面要接檔案或資料夾路徑");

@@ -23,7 +23,7 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <TabControl>
+    <TabControl SelectedIndex="{Binding SelectedTab}">
         <TabItem Header="處理程序" local:Glyph.Text="&#xE71D;">
             <Grid>
                 <Grid.RowDefinitions>
@@ -163,6 +163,104 @@
                         </ScrollViewer>
                     </Grid>
                 </ContentControl>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="網路" local:Glyph.Text="&#xE968;">
+            <Grid DataContext="{Binding Network}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                    <ListBox DockPanel.Dock="Left" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" DisplayMemberPath="Label"
+                             Style="{StaticResource SegmentList}" ItemContainerStyle="{StaticResource SegmentItem}" AutomationProperties.Name="網路檢視" />
+                    <Button DockPanel.Dock="Right" Content="匯出清單" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="把目前檢視的完整清單（含本機內部連線）匯出成 CSV（可用 Excel 開啟）" />
+                    <Button DockPanel.Dock="Right" Content="查詢主機名稱" Command="{Binding LookupHostNamesCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE774;" local:Glyph.Busy="{Binding LookupHostNamesCommand.IsRunning}"
+                            ToolTip="向這台電腦設定的 DNS 伺服器查詢畫面上各位址的名稱；不按就不會查詢" />
+                    <Button DockPanel.Dock="Right" Content="開啟檔案位置" Command="{Binding OpenLocationCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xE838;" Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}" />
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
+                    <TextBox DockPanel.Dock="Left" Width="230" Margin="0,0,16,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="{Binding SearchHint}" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋網路" />
+                    <ListBox DockPanel.Dock="Left" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Label"
+                             Style="{StaticResource SegmentList}" ItemContainerStyle="{StaticResource SegmentItem}" AutomationProperties.Name="篩選連線"
+                             Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}" />
+                </DockPanel>
+
+                <DockPanel Grid.Row="2" Margin="0,0,0,8">
+                    <CheckBox DockPanel.Dock="Right" Content="{Binding HiddenToggleText}" IsChecked="{Binding ShowInternalAndClosed}" Margin="16,0,0,0" VerticalAlignment="Top"
+                              Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding CountText}" Style="{StaticResource SubtleText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding NoteText}" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                   Margin="0,2,0,0" ToolTip="{Binding NoteText}" Visibility="{Binding NoteText, Converter={StaticResource TextToVisibility}}" />
+                        <TextBlock Text="{Binding StatusText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
+                                   ToolTip="{Binding StatusText}" Visibility="{Binding StatusText, Converter={StaticResource TextToVisibility}}" />
+                    </StackPanel>
+                </DockPanel>
+
+                <ContentControl Grid.Row="3" Style="{StaticResource Card}">
+                    <Grid>
+                        <DataGrid ItemsSource="{Binding ConnectionView}" SelectedItem="{Binding SelectedConnection}" EnableRowVirtualization="True"
+                                  AutomationProperties.Name="網路連線" Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="程式" Binding="{Binding ProgramName}" Width="1.1*" ElementStyle="{StaticResource CellText}" />
+                                <!-- The host name, once looked up, sits under the address. -->
+                                <DataGridTemplateColumn Header="位址" Width="1.5*" SortMemberPath="AddressText">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AddressText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding AddressText}" />
+                                                <TextBlock Text="{Binding HostName}" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding HostName}" Visibility="{Binding HostName, Converter={StaticResource TextToVisibility}}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="服務" Binding="{Binding ServiceText}" Width="136" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="範圍" Binding="{Binding ScopeText}" Width="92" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="狀態" Binding="{Binding StateText}" Width="80" ElementStyle="{StaticResource CellText}" />
+                            </DataGrid.Columns>
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSuspicious}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
+                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                        </DataGrid>
+                        <DataGrid ItemsSource="{Binding DeviceView}" EnableRowVirtualization="True" AutomationProperties.Name="區域網路裝置"
+                                  Visibility="{Binding IsDevices, Converter={StaticResource BoolToVisibility}}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="IP 位址" Binding="{Binding AddressText}" SortMemberPath="SortKey" Width="130" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="主機名稱" Binding="{Binding HostName}" Width="*" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="實體位址" Binding="{Binding Mac}" Width="172" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="網路卡" Binding="{Binding AdapterName}" Width="*" ElementStyle="{StaticResource CellText}" />
+                                <DataGridTextColumn Header="說明" Binding="{Binding RoleText}" Width="*" ElementStyle="{StaticResource CellText}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </ContentControl>
+
+                <StackPanel Grid.Row="4" Margin="0,10,0,0" Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{Binding DetailText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding DetailTooltip}"
+                               Visibility="{Binding DetailText, Converter={StaticResource TextToVisibility}}" />
+                    <TextBlock Text="{Binding WarningText}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding WarningText, Converter={StaticResource TextToVisibility}}" />
+                </StackPanel>
             </Grid>
         </TabItem>
     </TabControl>

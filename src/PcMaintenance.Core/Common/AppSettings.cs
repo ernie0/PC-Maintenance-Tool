@@ -18,6 +18,8 @@ public sealed record AppSettings
     public int DuplicateMinSizeMB { get; init; } = 1;
     /// <summary>Minimum days between two "--auto-clean" runs for the same user; 0 cleans at every run.</summary>
     public int AutoCleanIntervalDays { get; init; } = 7;
+    /// <summary>File of IP addresses and ranges the network tab marks as suspicious; empty means none. A relative path is read from %ProgramData%\PcMaintenance.</summary>
+    public string SuspiciousAddressList { get; init; } = "";
 
     public static AppSettings Default { get; } = new();
 
@@ -63,5 +65,6 @@ public static class SettingsLoader
         // JSON null overrides the initializer, so restore empty lists.
         DisabledJunkCategories = s.DisabledJunkCategories ?? [],
         ExcludedPaths = s.ExcludedPaths ?? [],
+        SuspiciousAddressList = s.SuspiciousAddressList ?? "",
     };
 }

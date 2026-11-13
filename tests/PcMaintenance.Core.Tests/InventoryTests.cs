@@ -15,6 +15,7 @@ public class InventoryTests
     [InlineData(new[] { "--export-software", @"\\伺服器\共用\" }, CliAction.ExportSoftware, false, @"\\伺服器\共用\")]
     [InlineData(new[] { "--export-startup", "a.csv" }, CliAction.ExportStartup, false, "a.csv")]
     [InlineData(new[] { "--export-system", "spec.csv" }, CliAction.ExportSystem, false, "spec.csv")]
+    [InlineData(new[] { "--export-connections", @"C:\盤點\" }, CliAction.ExportConnections, false, @"C:\盤點\")]
     public void Command_line_actions_are_recognised(string[] args, CliAction action, bool dryRun, string? path)
     {
         var command = CliCommand.Parse(args);
@@ -29,6 +30,7 @@ public class InventoryTests
     [InlineData("--export-software")]
     [InlineData("--export-software", "--clean")]
     [InlineData("--export-startup", "a.csv", "--dry-run")]
+    [InlineData("--export-connections")]
     public void Invalid_command_lines_are_rejected_instead_of_opening_the_window(params string[] args)
     {
         var command = CliCommand.Parse(args);
