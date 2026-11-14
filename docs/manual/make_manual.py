@@ -259,8 +259,8 @@ def installation(doc):
     heading(doc, "2.1　手動安裝", 2)
     para(doc, "安裝檔有兩種，裝好的程式與功能相同，差別只在 .NET 執行環境；兩種可以互相升級取代。")
     table(doc, ["安裝檔", "大小", "適用"], [
-        [f"PcMaintenance-Setup-{VERSION}.exe（完整版）", "約 43 MB", "任何電腦；內含執行環境，不需要網路"],
-        [f"PcMaintenance-Setup-{VERSION}-lite.exe（精簡版）", "約 4 MB", "已有 .NET 10 桌面執行環境的電腦；沒有時會先從 Microsoft 下載安裝（約 58 MB，需要網路）"],
+        [f"PcMaintenance-Setup-{VERSION}.exe（完整版）", "約 44 MB", "任何電腦；內含執行環境，不需要網路"],
+        [f"PcMaintenance-Setup-{VERSION}-lite.exe（精簡版）", "約 5 MB", "已有 .NET 10 桌面執行環境的電腦；沒有時會先從 Microsoft 下載安裝（約 58 MB，需要網路）"],
     ], [6.5, 2, 8])
     steps(doc, [
         "確認安裝檔與旁邊的 .sha256 檢查碼相符（PowerShell：Get-FileHash 安裝檔路徑）。",
