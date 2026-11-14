@@ -186,13 +186,18 @@ public sealed class NetworkDiagnosis
     internal static bool IsAutomaticPrivate(IPAddress address) =>
         address.AddressFamily == AddressFamily.InterNetwork && address.GetAddressBytes() is [169, 254, ..];
 
-    /// <summary>The connected physical card with an IPv4 default gateway; failing that, any connected physical card.</summary>
+    /// <summary>
+    /// The card the PC reaches other networks through: the one with an IPv4 default gateway, a physical card before a
+    /// virtual one. Inside a virtual machine (Windows Sandbox, a company's virtual desktop) the only card is virtual, so
+    /// virtual cards are not ruled out, only ranked after physical ones.
+    /// </summary>
     public static ActiveAdapter? ReadActiveAdapter()
     {
-        ActiveAdapter? fallback = null;
+        ActiveAdapter? best = null;
+        var bestRank = int.MaxValue;
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
         {
-            if (!NetworkActivitySampler.IsShown(nic.NetworkInterfaceType, nic.Description, nic.OperationalStatus)) continue;
+            if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) continue;
             IPInterfaceProperties properties;
             try
             {
@@ -216,11 +221,18 @@ public sealed class NetworkDiagnosis
             }
             var adapter = new ActiveAdapter(nic.Id, nic.Name, nic.Description, nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211,
                 nic.Speed, ipv4, dhcp, gateway, properties.DnsAddresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork).ToList());
-            if (gateway is not null) return adapter;
-            fallback ??= adapter;
+            var rank = Preference(gateway is not null, NetworkActivitySampler.IsShown(nic.NetworkInterfaceType, nic.Description, nic.OperationalStatus));
+            if (rank < bestRank)
+            {
+                best = adapter;
+                bestRank = rank;
+            }
         }
-        return fallback;
+        return best;
     }
+
+    /// <summary>Lower is better: a gateway matters more than being physical (a VPN without one is not the way out).</summary>
+    internal static int Preference(bool hasGateway, bool physical) => (hasGateway ? 0 : 2) + (physical ? 0 : 1);
 
     private static async Task<long?> PingAsync(IPAddress address, CancellationToken ct)
     {

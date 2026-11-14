@@ -99,6 +99,16 @@ public class NetworkDiagnosisTests
     }
 
     [Fact]
+    public void The_card_with_the_gateway_wins_and_a_virtual_one_still_counts()
+    {
+        // A physical card with a gateway beats a virtual one with a gateway (a host with Hyper-V or a VPN) …
+        Assert.True(NetworkDiagnosis.Preference(hasGateway: true, physical: true) < NetworkDiagnosis.Preference(true, false));
+        // … but a virtual card with a gateway (the only card inside a virtual machine) beats any card without one.
+        Assert.True(NetworkDiagnosis.Preference(true, false) < NetworkDiagnosis.Preference(false, true));
+        Assert.True(NetworkDiagnosis.Preference(false, true) < NetworkDiagnosis.Preference(false, false));
+    }
+
+    [Fact]
     public async Task No_connected_card_fails_first_and_skips_the_rest()
     {
         var steps = await Diagnosis(noAdapter: true).RunAsync();
