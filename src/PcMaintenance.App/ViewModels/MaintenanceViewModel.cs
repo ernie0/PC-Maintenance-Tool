@@ -13,6 +13,7 @@ using PcMaintenance.Core.Junk;
 using PcMaintenance.Core.Maintenance;
 using PcMaintenance.Core.Shortcuts;
 using PcMaintenance.Core.Startup;
+using PcMaintenance.Core.SystemInfo;
 using PcMaintenance.Core.Uninstall;
 
 namespace PcMaintenance.App.ViewModels;
@@ -188,6 +189,20 @@ public sealed partial class MaintenanceViewModel : PageViewModel
                 ActionText = "開啟 Windows 安全性",
                 Action = () => SystemActions.Open("windowsdefender:"),
             },
+            new("Windows 更新", "多久沒有安裝 Windows 更新，以及最近安裝失敗的更新（只讀紀錄，不會開始下載）",
+                "\uE895", Color.FromRgb(0x0E, 0x74, 0x90))
+            {
+                Scan = ScanUpdatesAsync,
+                ActionText = "開啟 Windows Update",
+                Action = () => SystemActions.Open("ms-settings:windowsupdate"),
+            },
+            new("裝置狀態", "裝置管理員中標示有問題的裝置，例如沒有驅動程式或無法啟動",
+                "\uE772", Color.FromRgb(0x4F, 0x46, 0xE5))
+            {
+                Scan = ScanDevicesAsync,
+                ActionText = "開啟裝置管理員",
+                Action = () => SystemActions.Open(Path.Combine(Environment.SystemDirectory, "devmgmt.msc")),
+            },
             new("重新開機", "Windows 更新是否在等待重新開機，以及電腦連續開機的天數",
                 "", Color.FromRgb(0x47, 0x55, 0x69))
             {
@@ -212,7 +227,7 @@ public sealed partial class MaintenanceViewModel : PageViewModel
     public override string Title => "一鍵維護";
 
     public override string Subtitle =>
-        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒與更新狀態，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
+        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒、Windows 更新與裝置狀態，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
 
     public ObservableCollection<MaintenanceCheck> Checks { get; }
 
@@ -691,6 +706,31 @@ public sealed partial class MaintenanceViewModel : PageViewModel
         return products.Any(p => p.Enabled)
             ? new CheckOutcome(CheckState.Advice, "防毒軟體的病毒碼不是最新")
             : new CheckOutcome(CheckState.Advice, "防毒軟體的即時保護沒有開啟");
+    }, ct);
+
+    private Task<CheckOutcome> ScanUpdatesAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("讀取 Windows Update 的安裝紀錄");
+        var status = UpdateHistory.Read();
+        if (!status.Readable) return new CheckOutcome(CheckState.Advice, "無法讀取 Windows Update 紀錄", "請到 Windows Update 確認更新狀態");
+        if (status.Failures.Count > 0)
+            return new CheckOutcome(CheckState.Advice, $"最近有 {status.Failures.Count} 個更新安裝失敗",
+                $"{HealthText.Failures(status)}；先到 Windows Update 重試，一直失敗時用「系統工具」的「重設 Windows 更新」");
+        var days = HealthText.DaysSinceUpdate(status, DateTime.Now);
+        if (days is null) return new CheckOutcome(CheckState.Advice, "找不到 Windows 更新的安裝紀錄", "請到 Windows Update 檢查更新");
+        return days >= HealthText.StaleUpdateDays
+            ? new CheckOutcome(CheckState.Advice, $"已經 {days} 天沒有安裝 Windows 更新", "Windows 每個月都有安全性更新，請到 Windows Update 檢查更新")
+            : new CheckOutcome(CheckState.Good, days == 0 ? "今天安裝過 Windows 更新" : $"{days} 天前安裝過 Windows 更新");
+    }, ct);
+
+    private Task<CheckOutcome> ScanDevicesAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("向裝置管理員查詢有問題的裝置");
+        var faulty = DeviceProblems.Read().Where(d => !d.IsDisabled).ToList();
+        return faulty.Count == 0
+            ? new CheckOutcome(CheckState.Good, "沒有發生問題的裝置")
+            : new CheckOutcome(CheckState.Advice, $"有 {faulty.Count} 個裝置發生問題",
+                string.Join("；", faulty.Take(3).Select(d => $"{d.Name}：{d.Reason}，{d.NextStep}")) + (faulty.Count > 3 ? $"；另有 {faulty.Count - 3} 個" : ""));
     }, ct);
 
     private Task<CheckOutcome> ScanRestartAsync(CancellationToken ct) => Task.Run(() =>

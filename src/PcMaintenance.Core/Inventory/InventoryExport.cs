@@ -98,10 +98,11 @@ public static class InventoryExport
     }
 
     /// <summary>One row per computer, so the files from every PC can be pasted under one header in Excel.</summary>
-    public static void WriteSystem(string path, ComputerInfo info, DateTime exportedAt)
+    public static void WriteSystem(string path, ComputerInfo info, ComputerHealth health, DateTime exportedAt)
     {
         string Join(IEnumerable<string> values) => string.Join("；", values.Where(v => v.Length > 0));
         var os = info.Os;
+        var updates = health.Updates;
         var machine = info.Machine;
         var cpu = info.Processor;
         string[] row =
@@ -126,12 +127,18 @@ public static class InventoryExport
             Join(info.Network.Select(n => n.Description)),
             Join(info.Network.Select(n => n.Mac)),
             Join(info.Network.SelectMany(n => n.IPv4)),
+            !updates.Readable ? "無法讀取" : updates.LastInstalledUtc?.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "沒有紀錄",
+            Join(updates.Failures.Select(f => f.Title)),
+            Join(health.Devices.Where(d => !d.IsDisabled).Select(d => $"{d.Name}（{d.Reason}）")),
+            Join(health.Batteries.Select(b => b.HealthPercent is { } percent ? $"{percent}%" : "無法讀取")),
+            Join(health.Printers.Select(p => p.IsDefault ? $"{p.Name}（預設）" : p.Name)),
             exportedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
         ];
         CsvFile.Write(path,
         [
             "電腦名稱", "網域／工作群組", "製造商", "型號", "序號", "主機板", "BIOS", "Windows", "版本", "組建", "安裝日期",
-            "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "網路卡", "MAC 位址", "IPv4 位址", "匯出時間",
+            "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "網路卡", "MAC 位址", "IPv4 位址",
+            "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "匯出時間",
         ], [row]);
     }
 }

@@ -43,7 +43,7 @@ public static class CommandRunner
                     target => InventoryExport.WriteStartup(target, StartupManager.CreateDefault(services.Settings, services.Journal, log).Load().Items, Environment.MachineName)),
                 CliAction.ExportSystem => Export(command.Path!, InventoryExport.SystemKind, log, target =>
                 {
-                    InventoryExport.WriteSystem(target, SystemInfoReader.Read(), DateTime.Now);
+                    InventoryExport.WriteSystem(target, SystemInfoReader.Read(), ComputerHealth.Read(), DateTime.Now);
                     return 1;
                 }),
                 CliAction.ExportConnections => Export(command.Path!, InventoryExport.ConnectionsKind, log, target =>

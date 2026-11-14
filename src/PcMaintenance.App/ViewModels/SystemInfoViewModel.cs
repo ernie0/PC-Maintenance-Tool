@@ -23,6 +23,9 @@ public sealed record InfoSection(string Title, IReadOnlyList<LabeledValue> Rows)
         "顯示卡" => "",
         "磁碟" => "",
         "網路介面卡" => "",
+        "裝置狀態" => "\uE772",
+        "電池" => "\uE83F",
+        "印表機" => "\uE749",
         _ => "",
     };
 }
@@ -30,6 +33,7 @@ public sealed record InfoSection(string Title, IReadOnlyList<LabeledValue> Rows)
 public sealed partial class SystemInfoViewModel(AppServices services) : PageViewModel
 {
     private ComputerInfo? _info;
+    private ComputerHealth? _health;
     private IReadOnlyList<InfoSection> _sections = [];
 
     public override string Title => "電腦資訊";
@@ -58,8 +62,8 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
         StatusText = "正在讀取電腦資訊…";
         try
         {
-            _info = await Task.Run(SystemInfoReader.Read);
-            _sections = Sections(_info);
+            (_info, _health) = await Task.Run(() => (SystemInfoReader.Read(), ComputerHealth.Read()));
+            _sections = Sections(_info, _health, services.IsElevated, DateTime.Now);
             // Each section goes to the shorter column so the two columns end up about the same height.
             LeftSections.Clear();
             RightSections.Clear();
@@ -113,10 +117,10 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
     [RelayCommand(CanExecute = nameof(HasInfo))]
     private void Export()
     {
-        if (_info is null || Dialogs.AskCsvPath(InventoryExport.SystemKind) is not { } path) return;
+        if (_info is null || _health is null || Dialogs.AskCsvPath(InventoryExport.SystemKind) is not { } path) return;
         try
         {
-            InventoryExport.WriteSystem(path, _info, DateTime.Now);
+            InventoryExport.WriteSystem(path, _info, _health, DateTime.Now);
             services.Log.Info($"匯出電腦配備：{path}");
             StatusText = $"已匯出到 {path}";
         }
@@ -126,7 +130,7 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
         }
     }
 
-    internal static IReadOnlyList<InfoSection> Sections(ComputerInfo info)
+    internal static IReadOnlyList<InfoSection> Sections(ComputerInfo info, ComputerHealth health, bool isElevated, DateTime now)
     {
         static string Or(string value) => value.Length > 0 ? value : "—";
         static string Date(DateTime? date) => date?.ToString("yyyy/MM/dd") ?? "—";
@@ -145,6 +149,10 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
                 new("系統類型", $"{os.Architecture}作業系統"),
                 new("安裝日期", Date(os.InstallDate)),
                 new("上次開機", os.LastBoot.ToString("yyyy/MM/dd HH:mm")),
+                new("上次更新", HealthText.LastUpdate(health.Updates, now)),
+                .. health.Updates.Failures.Count > 0
+                    ? [new LabeledValue("安裝失敗", HealthText.Failures(health.Updates))]
+                    : Array.Empty<LabeledValue>(),
             ]),
             new("電腦",
             [
@@ -199,6 +207,29 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
                 n.SpeedBitsPerSecond > 0 ? (n.SpeedBitsPerSecond >= 1_000_000_000 ? $"{n.SpeedBitsPerSecond / 1e9:0.#} Gbps" : $"{n.SpeedBitsPerSecond / 1e6:0} Mbps") : "",
                 n.IPv4.Count > 0 ? $"IPv4 {string.Join("、", n.IPv4)}" : "",
                 n.Mac.Length > 0 ? $"實體位址 {n.Mac}" : "",
+            }.Where(s => s.Length > 0)))).ToList()));
+
+        var faulty = health.Devices.Where(d => !d.IsDisabled).ToList();
+        var disabled = health.Devices.Where(d => d.IsDisabled).ToList();
+        sections.Add(new("裝置狀態",
+        [
+            .. faulty.Count == 0
+                ? [new LabeledValue("狀態", "裝置管理員中沒有發生問題的裝置")]
+                : faulty.Select(d => new LabeledValue("有問題", $"{d.Name}：{d.Reason}。{d.NextStep}。")),
+            .. disabled.Select(d => new LabeledValue("已停用", d.Name)),
+        ]));
+
+        foreach (var battery in health.Batteries)
+            sections.Add(new("電池", HealthText.Battery(battery, isElevated)));
+
+        sections.Add(new("印表機", health.Printers.Count == 0
+            ? [new LabeledValue("狀態", "沒有安裝印表機")]
+            : health.Printers.Select(p => new LabeledValue(p.IsDefault ? "預設" : "印表機", string.Join("・", new[]
+            {
+                p.Name,
+                p.IsNetwork ? "網路印表機" : "",
+                p.IsOffline ? "離線" : "",
+                p.Jobs > 0 ? $"{p.Jobs} 個列印工作等待中" : "",
             }.Where(s => s.Length > 0)))).ToList()));
         return sections;
     }
