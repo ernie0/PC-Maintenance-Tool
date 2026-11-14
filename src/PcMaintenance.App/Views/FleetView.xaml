@@ -1,0 +1,69 @@
+<UserControl x:Class="PcMaintenance.App.Views.FleetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PcMaintenance.App"
+             xmlns:vm="clr-namespace:PcMaintenance.App.ViewModels">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,10" LastChildFill="False">
+            <Button DockPanel.Dock="Left" Content="選擇資料夾" Command="{Binding ChooseFolderCommand}" Style="{StaticResource PrimaryButton}"
+                    local:Glyph.Text="&#xE8B7;" />
+            <Button DockPanel.Dock="Left" Content="重新讀取" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding LoadCommand.IsRunning}" />
+            <Button DockPanel.Dock="Left" Content="匯出彙整表" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="一台電腦一列，含需要注意的事項，可以用 Excel 開啟" />
+            <Button DockPanel.Dock="Right" Content="開啟資料夾" Command="{Binding OpenFolderCommand}" Style="{StaticResource SecondaryButton}"
+                    local:Glyph.Text="&#xE838;" />
+        </DockPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+            <TextBlock Text="{Binding Folder, StringFormat=資料夾：{0}}" Style="{StaticResource SubtleText}" TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding HasFolder, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Folder}" />
+            <TextBlock Text="{Binding SummaryText}" TextWrapping="Wrap" Margin="0,2,0,0" Visibility="{Binding SummaryText, Converter={StaticResource TextToVisibility}}" />
+        </StackPanel>
+
+        <DockPanel Grid.Row="2" Margin="0,0,0,10">
+            <CheckBox DockPanel.Dock="Left" Content="只顯示需要注意的電腦" IsChecked="{Binding OnlyAttention}" VerticalAlignment="Center" Margin="0,0,16,0" />
+            <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,6">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE946;" Style="{StaticResource IconText}" FontSize="15" Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Top" Margin="0,1,10,0" />
+                    <TextBlock Text="{x:Static vm:FleetViewModel.HowToCollect}" TextWrapping="Wrap" FontSize="13" />
+                </DockPanel>
+            </Border>
+        </DockPanel>
+
+        <ContentControl Grid.Row="3" Style="{StaticResource Card}">
+            <DataGrid ItemsSource="{Binding RowsView}" SelectedItem="{Binding SelectedRow}" EnableRowVirtualization="True" AutomationProperties.Name="各台電腦">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="電腦名稱" Binding="{Binding Name}" Width="1*" MinWidth="88" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="Windows" Binding="{Binding Windows}" Width="1.1*" MinWidth="104" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="上次更新" Binding="{Binding UpdateText}" SortMemberPath="Computer.LastUpdate" Width="184" MinWidth="112" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="剩餘空間" Binding="{Binding SpaceText}" SortMemberPath="Computer.LowestFreePercent" Width="92" MinWidth="64" ElementStyle="{StaticResource CellTextRight}" />
+                    <DataGridTextColumn Header="需要注意" Binding="{Binding ConcernText}" Width="2*" MinWidth="120" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="資料時間" Binding="{Binding ExportedText}" SortMemberPath="Computer.ExportedAt" Width="116" MinWidth="100" ElementStyle="{StaticResource CellText}" />
+                </DataGrid.Columns>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </ContentControl>
+
+        <TextBlock Grid.Row="4" Text="{Binding DetailText}" TextWrapping="Wrap" Margin="0,10,0,0"
+                   Visibility="{Binding DetailText, Converter={StaticResource TextToVisibility}}" />
+    </Grid>
+</UserControl>

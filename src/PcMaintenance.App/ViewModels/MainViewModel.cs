@@ -56,6 +56,7 @@ public sealed partial class MainViewModel : ObservableObject
             new NavItem("系統調校", "", MotionKind.Nudge, Color.FromRgb(0x4D, 0x7C, 0x0F), new TweaksViewModel(services)),
             new NavItem("系統工具", "", MotionKind.Bounce, Color.FromRgb(0x47, 0x55, 0x69), new ToolsViewModel(services)),
             new NavItem("電腦資訊", "", MotionKind.Pop, Color.FromRgb(0x4F, 0x46, 0xE5), new SystemInfoViewModel(services)),
+            new NavItem("多台電腦", "\uE7F4", MotionKind.Pop, Color.FromRgb(0x0F, 0x76, 0x6E), new FleetViewModel(services)),
             new NavItem("變更紀錄", "", MotionKind.Rewind, Color.FromRgb(0x78, 0x71, 0x6C), new JournalViewModel(services)),
         ];
         maintenance.NavigateRequested += pageType => SelectedPage = Pages.First(p => p.Page.GetType() == pageType);

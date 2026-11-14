@@ -125,6 +125,7 @@ public static class InventoryExport
             Join(info.MemoryModules.Modules.Select(m => $"{m.Slot} {ByteSize.Format((long)m.CapacityBytes)} {m.Type} {m.SpeedMHz} MHz".Trim())),
             Join(info.Gpus.Select(g => g.Name)),
             Join(info.Disks.Disks.Select(d => $"{d.Model} {ByteSize.Format(d.SizeBytes)} {d.MediaType}（{d.Health}）")),
+            Join(info.Disks.Volumes.Where(v => !v.IsRemovable).Select(v => $"{v.Letter}: 剩 {ByteSize.Format(v.FreeBytes)}／{ByteSize.Format(v.TotalBytes)}（{v.FreePercent:0}%）")),
             Join(info.Network.Select(n => n.Description)),
             Join(info.Network.Select(n => n.Mac)),
             Join(info.Network.SelectMany(n => n.IPv4)),
@@ -147,7 +148,7 @@ public static class InventoryExport
         CsvFile.Write(path,
         [
             "電腦名稱", "網域／工作群組", "製造商", "型號", "序號", "主機板", "BIOS", "Windows", "版本", "組建", "安裝日期",
-            "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "網路卡", "MAC 位址", "IPv4 位址",
+            "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "磁碟空間", "網路卡", "MAC 位址", "IPv4 位址",
             "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "安全性建議", "最近 30 天的問題", "匯出時間",
         ], [row]);
     }

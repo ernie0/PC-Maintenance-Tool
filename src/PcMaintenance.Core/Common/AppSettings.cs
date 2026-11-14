@@ -22,6 +22,8 @@ public sealed record AppSettings
     public string SuspiciousAddressList { get; init; } = "";
     /// <summary>Whether the uninstall page may check for and run software updates through winget.</summary>
     public bool AllowSoftwareUpdates { get; init; } = true;
+    /// <summary>Where PCs leave their --export-system files; the multi-computer page opens it until a user picks another.</summary>
+    public string InventoryFolder { get; init; } = "";
 
     public static AppSettings Default { get; } = new();
 
@@ -68,5 +70,6 @@ public static class SettingsLoader
         DisabledJunkCategories = s.DisabledJunkCategories ?? [],
         ExcludedPaths = s.ExcludedPaths ?? [],
         SuspiciousAddressList = s.SuspiciousAddressList ?? "",
+        InventoryFolder = s.InventoryFolder ?? "",
     };
 }

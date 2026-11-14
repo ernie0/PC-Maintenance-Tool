@@ -37,5 +37,9 @@
 
   // 「軟體解除安裝 → 軟體更新」是否開放：用 Windows 的套件管理員（winget）查詢並更新已安裝的軟體（查詢時會連到 winget 的軟體來源）。
   // 由公司統一派送、管理軟體版本的電腦，可以設成 false 關閉。
-  "allowSoftwareUpdates": true
+  "allowSoftwareUpdates": true,
+
+  // 「多台電腦」頁預設讀取的資料夾：各台電腦用 PcMaintenance.exe --export-system "<這個資料夾>\" 存放電腦配備檔的地方，空白表示由使用者自己選。
+  // 例如 "\\伺服器\共用\電腦盤點"。
+  "inventoryFolder": ""
 }

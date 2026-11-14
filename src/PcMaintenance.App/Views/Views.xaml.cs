@@ -2,6 +2,11 @@ using System.Windows.Controls;
 
 namespace PcMaintenance.App.Views;
 
+public partial class FleetView : UserControl
+{
+    public FleetView() => InitializeComponent();
+}
+
 public partial class MaintenanceView : UserControl
 {
     public MaintenanceView() => InitializeComponent();
