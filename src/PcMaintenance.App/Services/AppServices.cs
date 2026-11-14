@@ -77,6 +77,20 @@ public static class Dialogs
     public static void Error(string message, string title = "無法完成操作") =>
         MessageBox.Show(Owner(), message, title, MessageBoxButton.OK, MessageBoxImage.Error);
 
+    /// <summary>Asks where to save the health report; the suggested name carries the computer name and date.</summary>
+    public static string? AskReportPath()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = $"匯出{HealthReport.Kind}",
+            Filter = "網頁（可用瀏覽器開啟、列印）|*.html",
+            DefaultExt = ".html",
+            FileName = InventoryExport.DefaultFileName(HealthReport.Kind, Environment.MachineName, DateTime.Now, ".html"),
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        };
+        return dialog.ShowDialog(Owner()) == true ? dialog.FileName : null;
+    }
+
     /// <summary>Asks where to save an inventory CSV; the suggested name carries the computer name and date.</summary>
     public static string? AskCsvPath(string kind)
     {
@@ -105,6 +119,12 @@ public static class Shell
     {
         if (File.Exists(path)) Process.Start("explorer.exe", $"/select,\"{path}\"");
         else if (Directory.Exists(path)) Process.Start("explorer.exe", $"\"{path}\"");
+    }
+
+    /// <summary>Opens a file with the program Windows associates with it, e.g. a report in the browser.</summary>
+    public static void OpenFile(string path)
+    {
+        if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
     }
 
     public static void OpenFolder(string folder)

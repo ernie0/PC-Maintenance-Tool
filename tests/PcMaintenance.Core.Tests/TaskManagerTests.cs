@@ -133,7 +133,7 @@ public class TaskManagerTests
     {
         using var temp = new TempDir();
         var file = Path.Combine(temp.Path, "spec.csv");
-        InventoryExport.WriteSystem(file, SystemInfoReader.Read(), ComputerHealth.Read(), new DateTime(2026, 10, 25, 9, 0, 0));
+        InventoryExport.WriteSystem(file, SystemInfoReader.Read(), ComputerHealth.Read(isElevated: false), new DateTime(2026, 10, 25, 9, 0, 0));
 
         var lines = File.ReadAllText(file).TrimEnd().Split("\r\n");
         Assert.Equal(2, lines.Length);

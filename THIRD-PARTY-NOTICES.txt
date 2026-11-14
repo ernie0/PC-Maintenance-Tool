@@ -15,6 +15,7 @@ Windows Desktop 執行環境（WPF，Microsoft.WindowsDesktop.App）
   只有完整版安裝檔內含。Bundled with the full installer only.
 System.Management                                  MIT            https://github.com/dotnet/runtime
 System.ServiceProcess.ServiceController            MIT            https://github.com/dotnet/runtime
+System.Diagnostics.EventLog                        MIT            https://github.com/dotnet/runtime
 CommunityToolkit.Mvvm                              MIT            https://github.com/CommunityToolkit/dotnet
 
 .NET 執行環境與 WPF 本身也包含其他第三方元件，其授權聲明見：
@@ -27,7 +28,7 @@ When the .NET 10 desktop runtime is missing, the lite installer downloads Micros
 runtime installer, which installs the runtime under Microsoft's own terms.
 
 ------------------------------------------------------------------------------------------------
-.NET Runtime, WPF, System.Management, System.ServiceProcess.ServiceController
+.NET Runtime, WPF, System.Management, System.ServiceProcess.ServiceController, System.Diagnostics.EventLog
 
 The MIT License (MIT)
 

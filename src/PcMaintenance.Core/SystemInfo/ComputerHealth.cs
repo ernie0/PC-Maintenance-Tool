@@ -1,5 +1,6 @@
 using System.Management;
 using System.Runtime.InteropServices;
+using PcMaintenance.Core.Network;
 
 namespace PcMaintenance.Core.SystemInfo;
 
@@ -31,12 +32,25 @@ public sealed record BatteryHealth(string Name, long? DesignedMWh, long? FullCha
 
 public sealed record PrinterEntry(string Name, bool IsDefault, bool IsOffline, bool IsNetwork, int Jobs);
 
-/// <summary>Things worth a look that the hardware list does not show: updates, faulty devices, battery wear, printers.</summary>
+/// <summary>
+/// Things worth a look that the hardware list does not show: updates, faulty devices, battery wear, printers, security
+/// settings and what went wrong lately.
+/// </summary>
 public sealed record ComputerHealth(
-    UpdateStatus Updates, IReadOnlyList<ProblemDevice> Devices, IReadOnlyList<BatteryHealth> Batteries, IReadOnlyList<PrinterEntry> Printers)
+    UpdateStatus Updates, IReadOnlyList<ProblemDevice> Devices, IReadOnlyList<BatteryHealth> Batteries, IReadOnlyList<PrinterEntry> Printers,
+    IReadOnlyList<DiagnosisStep> Security, StabilityReport Stability)
 {
-    /// <summary>Reads everything; slow parts (the update history takes a few seconds) belong on a background thread.</summary>
-    public static ComputerHealth Read() => new(UpdateHistory.Read(), DeviceProblems.Read(), BatteryReader.Read(), PrinterList.Read());
+    /// <summary>Reads everything; it takes a second or two, so call it on a background thread.</summary>
+    /// <param name="isElevated">Disk encryption can only be read as an administrator.</param>
+    public static ComputerHealth Read(bool isElevated)
+    {
+        var batteries = BatteryReader.Read();
+        return new(UpdateHistory.Read(), DeviceProblems.Read(), batteries, PrinterList.Read(),
+            SecurityChecks.Read(isElevated, isLaptop: batteries.Count > 0), StabilityReader.Read());
+    }
+
+    /// <summary>Security findings that call for a change.</summary>
+    public IEnumerable<DiagnosisStep> SecurityConcerns => Security.Where(s => s.Result is DiagnosisResult.Warning or DiagnosisResult.Fail);
 }
 
 public static class DeviceProblems

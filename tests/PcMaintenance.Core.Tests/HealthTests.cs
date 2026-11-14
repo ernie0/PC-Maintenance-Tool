@@ -58,7 +58,7 @@ public class HealthTests
     [Fact]
     public void Reading_health_on_this_computer_works_without_elevation()
     {
-        var health = ComputerHealth.Read();
+        var health = ComputerHealth.Read(isElevated: false);
         Assert.True(health.Updates.Readable);
         Assert.All(health.Printers, p => Assert.NotEqual("", p.Name));
         Assert.True(health.Printers.Count(p => p.IsDefault) <= 1);

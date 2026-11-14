@@ -24,6 +24,8 @@ public sealed record InfoSection(string Title, IReadOnlyList<LabeledValue> Rows)
         "磁碟" => "",
         "網路介面卡" => "",
         "裝置狀態" => "\uE772",
+        "安全性" => "\uE72E",
+        "穩定度（最近 30 天）" => "\uE9D9",
         "電池" => "\uE83F",
         "印表機" => "\uE749",
         _ => "",
@@ -44,7 +46,7 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
     public ObservableCollection<InfoSection> RightSections { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(CopyCommand), nameof(ExportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(CopyCommand), nameof(ExportCommand), nameof(ExportReportCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -62,7 +64,7 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
         StatusText = "正在讀取電腦資訊…";
         try
         {
-            (_info, _health) = await Task.Run(() => (SystemInfoReader.Read(), ComputerHealth.Read()));
+            (_info, _health) = await Task.Run(() => (SystemInfoReader.Read(), ComputerHealth.Read(services.IsElevated)));
             _sections = Sections(_info, _health, services.IsElevated, DateTime.Now);
             // Each section goes to the shorter column so the two columns end up about the same height.
             LeftSections.Clear();
@@ -127,6 +129,36 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Dialogs.Error($"無法匯出：{UserMessage.For(ex)}");
+        }
+    }
+
+    /// <summary>Writes the printable health report and opens it in the browser, from where it can be printed or saved as PDF.</summary>
+    [RelayCommand(CanExecute = nameof(HasInfo))]
+    private async Task ExportReportAsync()
+    {
+        if (_info is null || _health is null || Dialogs.AskReportPath() is not { } path) return;
+        IsBusy = true;
+        StatusText = "正在產生電腦健檢報告…";
+        try
+        {
+            var info = _info;
+            var health = _health;
+            await Task.Run(() =>
+            {
+                var data = HealthReportData.Collect(services.IsElevated) with { Info = info, Health = health };
+                HealthReport.Write(path, data);
+            });
+            services.Log.Info($"匯出電腦健檢報告：{path}");
+            Shell.OpenFile(path);
+            StatusText = $"已匯出到 {path}，並用瀏覽器開啟（可以從瀏覽器列印或存成 PDF）。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Dialogs.Error($"無法匯出：{UserMessage.For(ex)}");
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -218,6 +250,9 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
                 : faulty.Select(d => new LabeledValue("有問題", $"{d.Name}：{d.Reason}。{d.NextStep}。")),
             .. disabled.Select(d => new LabeledValue("已停用", d.Name)),
         ]));
+
+        sections.Add(new("安全性", HealthText.Security(health.Security)));
+        sections.Add(new("穩定度（最近 30 天）", HealthText.Stability(health.Stability)));
 
         foreach (var battery in health.Batteries)
             sections.Add(new("電池", HealthText.Battery(battery, isElevated)));

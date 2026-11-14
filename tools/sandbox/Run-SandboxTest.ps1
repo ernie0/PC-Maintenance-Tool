@@ -68,7 +68,12 @@ $done = Join-Path $out 'DONE'
 for ($attempt = 1; $attempt -le 3; $attempt++) {
   Start-Process "$env:windir\System32\WindowsSandbox.exe" -ArgumentList ('"' + $config + '"')
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  while ($sw.Elapsed.TotalMinutes -lt 5 -and -not (Test-Path $log)) { Start-Sleep -Seconds 10; if (Invoke-Reconnect) { '按了 Sandbox 視窗的「重新連線」' } }
+  # Pressing again too soon cuts short a reconnect that is still under way.
+  $pressed = -60
+  while ($sw.Elapsed.TotalMinutes -lt 5 -and -not (Test-Path $log)) {
+    Start-Sleep -Seconds 10
+    if ($sw.Elapsed.TotalSeconds - $pressed -ge 60 -and (Invoke-Reconnect)) { $pressed = $sw.Elapsed.TotalSeconds; '按了 Sandbox 視窗的「重新連線」' }
+  }
   if (Test-Path $log) { break }
   "第 $attempt 次：5 分鐘內沒有登入，關閉後重試"
   Stop-Sandboxes

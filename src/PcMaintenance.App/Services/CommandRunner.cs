@@ -43,7 +43,7 @@ public static class CommandRunner
                     target => InventoryExport.WriteStartup(target, StartupManager.CreateDefault(services.Settings, services.Journal, log).Load().Items, Environment.MachineName)),
                 CliAction.ExportSystem => Export(command.Path!, InventoryExport.SystemKind, log, target =>
                 {
-                    InventoryExport.WriteSystem(target, SystemInfoReader.Read(), ComputerHealth.Read(), DateTime.Now);
+                    InventoryExport.WriteSystem(target, SystemInfoReader.Read(), ComputerHealth.Read(services.IsElevated), DateTime.Now);
                     return 1;
                 }),
                 CliAction.ExportConnections => Export(command.Path!, InventoryExport.ConnectionsKind, log, target =>
@@ -52,6 +52,11 @@ public static class CommandRunner
                     if (suspicious.Error is { } listError) log.Warn(listError);
                     return InventoryExport.WriteConnections(target, ConnectionInventory.ReadCurrent(suspicious.List), Environment.MachineName);
                 }),
+                CliAction.ExportReport => Export(command.Path!, HealthReport.Kind, log, target =>
+                {
+                    HealthReport.Write(target, HealthReportData.Collect(services.IsElevated));
+                    return 1;
+                }, ".html"),
                 CliAction.RestorePoint => CreateRestorePoint(services),
                 _ => InvalidArguments,
             };
@@ -99,9 +104,9 @@ public static class CommandRunner
         };
     }
 
-    private static int Export(string path, string kind, FileLog log, Func<string, int> write)
+    private static int Export(string path, string kind, FileLog log, Func<string, int> write, string extension = ".csv")
     {
-        var target = InventoryExport.ResolveTarget(path, kind, Environment.MachineName, DateTime.Now);
+        var target = InventoryExport.ResolveTarget(path, kind, Environment.MachineName, DateTime.Now, extension);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
         var count = write(target);
         log.Info($"匯出{kind}：{count} 筆，{target}");

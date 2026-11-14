@@ -28,6 +28,8 @@
                     Margin="16,0,0,0" ToolTip="把所有項目（含 Microsoft 項目）匯出成 CSV（可用 Excel 開啟）" />
             <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="{Binding CountText}" Style="{StaticResource SubtleText}" />
+                <TextBlock Text="{Binding BootText}" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                           Margin="0,2,0,0" ToolTip="{Binding BootDetail}" Visibility="{Binding BootText, Converter={StaticResource TextToVisibility}}" />
                 <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource WarningTextBrush}" TextWrapping="Wrap"
                            Visibility="{Binding StatusText, Converter={StaticResource TextToVisibility}}" />
             </StackPanel>

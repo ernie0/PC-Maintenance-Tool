@@ -43,6 +43,9 @@
                     local:Glyph.Text="&#xE8C8;" />
             <Button DockPanel.Dock="Left" Content="匯出 CSV" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="一台電腦一列，方便把各台電腦的檔案合併成一張表" />
+            <Button DockPanel.Dock="Left" Content="匯出健檢報告" Command="{Binding ExportReportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    local:Glyph.Text="&#xE9F9;" local:Glyph.Busy="{Binding ExportReportCommand.IsRunning}"
+                    ToolTip="一頁可以列印的報告：需要注意的事項、配備、更新、安全性設定與最近的當機紀錄；含序號與網路位址，請只交給維護人員" />
             <Button DockPanel.Dock="Right" Content="重新整理" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                     local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshCommand.IsRunning}" />
         </DockPanel>

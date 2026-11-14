@@ -87,6 +87,13 @@ public sealed partial class StartupViewModel : PageViewModel
     [ObservableProperty]
     private string _countText = "";
 
+    /// <summary>How long the last starts took and what slowed them, from Windows' own measurements.</summary>
+    [ObservableProperty]
+    private string _bootText = "";
+
+    [ObservableProperty]
+    private string? _bootDetail;
+
     public bool HasSelection => SelectedItem is not null;
     public bool IsServiceSelected => SelectedItem?.Item.Source == StartupSource.Service;
     public string SelectionHint => SelectedItem is null ? "" : WhyLocked(SelectedItem.Item) ?? "";
@@ -110,7 +117,8 @@ public sealed partial class StartupViewModel : PageViewModel
         StatusText = "正在讀取開機項目、排程工作與服務…";
         try
         {
-            var result = await Task.Run(_manager.Load);
+            var (result, boot) = await Task.Run(() => (_manager.Load(), BootPerformance.Read()));
+            (BootText, BootDetail) = DescribeBoot(boot, _services.IsElevated);
             _all = result.Items.Select(i => new StartupRow(i)).ToList();
             _loaded = true;
             ApplyFilter();
@@ -123,6 +131,22 @@ public sealed partial class StartupViewModel : PageViewModel
     }
 
     private bool CanRefresh() => !IsBusy;
+
+    internal static (string Text, string? Detail) DescribeBoot(BootReport boot, bool isElevated)
+    {
+        static string Seconds(TimeSpan t) => $"{t.TotalSeconds:0} 秒";
+        if (!boot.Readable)
+            return (isElevated ? "無法讀取 Windows 的開機時間紀錄。" : "以系統管理員執行可以看到每次開機花多久，以及拖慢開機的程式、驅動程式與服務。", null);
+        if (boot.Last is not { } last) return ("Windows 還沒有記錄開機時間。", null);
+        var text = $"上次開機到桌面 {Seconds(last.ToDesktop)}、到完全就緒 {Seconds(last.ToReady)}" +
+                   (boot.Boots.Count > 1 ? $"（最近 {Math.Min(10, boot.Boots.Count)} 次平均到桌面 {Seconds(boot.AverageToDesktop!.Value)}）" : "");
+        if (boot.SlowStarters.Count == 0) return (text + "。", null);
+        var worst = boot.SlowStarters[0];
+        text += $"；拖慢開機最多的是{worst.Kind}「{worst.Name}」（多 {worst.Delay.TotalSeconds:0.#} 秒）。";
+        var detail = "Windows 記錄到拖慢開機的項目：\n" + string.Join("\n", boot.SlowStarters.Take(8).Select(s =>
+            $"{s.Kind}「{s.Name}」多 {s.Delay.TotalSeconds:0.#} 秒（{s.TimeUtc.ToLocalTime():yyyy/MM/dd}）"));
+        return (text, detail);
+    }
 
     /// <summary>Exports every item, Microsoft ones included and marked, regardless of the current filter.</summary>
     [RelayCommand(CanExecute = nameof(CanExport))]

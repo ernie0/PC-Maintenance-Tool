@@ -17,12 +17,13 @@ public static class InventoryExport
     public const string ConnectionsKind = "網路連線";
     public const string DevicesKind = "區域網路裝置";
 
-    public static string DefaultFileName(string kind, string computerName, DateTime now) => $"{kind}-{computerName}-{now:yyyyMMdd}.csv";
+    public static string DefaultFileName(string kind, string computerName, DateTime now, string extension = ".csv") =>
+        $"{kind}-{computerName}-{now:yyyyMMdd}{extension}";
 
     /// <summary>An existing folder, or a path ending in a separator, gets the default file name inside it.</summary>
-    public static string ResolveTarget(string path, string kind, string computerName, DateTime now) =>
+    public static string ResolveTarget(string path, string kind, string computerName, DateTime now, string extension = ".csv") =>
         path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar) || Directory.Exists(path)
-            ? Path.Combine(path, DefaultFileName(kind, computerName, now))
+            ? Path.Combine(path, DefaultFileName(kind, computerName, now, extension))
             : path;
 
     public static int WriteSoftware(string path, IEnumerable<InstalledApp> apps, string computerName)
@@ -132,13 +133,22 @@ public static class InventoryExport
             Join(health.Devices.Where(d => !d.IsDisabled).Select(d => $"{d.Name}（{d.Reason}）")),
             Join(health.Batteries.Select(b => b.HealthPercent is { } percent ? $"{percent}%" : "無法讀取")),
             Join(health.Printers.Select(p => p.IsDefault ? $"{p.Name}（預設）" : p.Name)),
+            Join(health.SecurityConcerns.Select(c => c.Title)),
+            !health.Stability.Readable ? "無法讀取" : Join(new[]
+            {
+                health.Stability.BlueScreens.Count > 0 ? $"藍色畫面 {health.Stability.BlueScreens.Count}" : "",
+                health.Stability.UnexpectedShutdowns.Count > 0 ? $"不正常關機 {health.Stability.UnexpectedShutdowns.Count}" : "",
+                health.Stability.DiskErrors.Count > 0 ? $"磁碟錯誤 {health.Stability.DiskErrors.Count}" : "",
+                health.Stability.HardwareErrors.Count > 0 ? $"硬體錯誤 {health.Stability.HardwareErrors.Count}" : "",
+                health.Stability.ProgramCrashes.Count > 0 ? $"程式當機 {health.Stability.ProgramCrashes.Sum(p => p.Count)}" : "",
+            }),
             exportedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
         ];
         CsvFile.Write(path,
         [
             "電腦名稱", "網域／工作群組", "製造商", "型號", "序號", "主機板", "BIOS", "Windows", "版本", "組建", "安裝日期",
             "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "網路卡", "MAC 位址", "IPv4 位址",
-            "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "匯出時間",
+            "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "安全性建議", "最近 30 天的問題", "匯出時間",
         ], [row]);
     }
 }

@@ -203,6 +203,20 @@ public sealed partial class MaintenanceViewModel : PageViewModel
                 ActionText = "開啟裝置管理員",
                 Action = () => SystemActions.Open(Path.Combine(Environment.SystemDirectory, "devmgmt.msc")),
             },
+            new("系統穩定度", "最近 30 天的藍色畫面、不正常關機、磁碟錯誤與硬體錯誤（讀取 Windows 事件記錄）",
+                "\uE9D9", Color.FromRgb(0xBE, 0x18, 0x5D))
+            {
+                Scan = ScanStabilityAsync,
+                ActionText = "開啟可靠性監視器",
+                Action = () => SystemActions.Open(Path.Combine(Environment.SystemDirectory, "perfmon.exe"), "/rel"),
+            },
+            new("安全性設定", "防火牆、使用者帳戶控制、遠端桌面、SMBv1、自動登入等設定（只檢查，不會修改）",
+                "\uE72E", Color.FromRgb(0x15, 0x80, 0x3D))
+            {
+                Scan = ScanSecuritySettingsAsync,
+                ActionText = "前往電腦資訊",
+                Action = () => NavigateRequested?.Invoke(typeof(SystemInfoViewModel)),
+            },
             new("重新開機", "Windows 更新是否在等待重新開機，以及電腦連續開機的天數",
                 "", Color.FromRgb(0x47, 0x55, 0x69))
             {
@@ -227,7 +241,7 @@ public sealed partial class MaintenanceViewModel : PageViewModel
     public override string Title => "一鍵維護";
 
     public override string Subtitle =>
-        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒、Windows 更新與裝置狀態，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
+        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒、Windows 更新、裝置、穩定度與安全性設定，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
 
     public ObservableCollection<MaintenanceCheck> Checks { get; }
 
@@ -731,6 +745,29 @@ public sealed partial class MaintenanceViewModel : PageViewModel
             ? new CheckOutcome(CheckState.Good, "沒有發生問題的裝置")
             : new CheckOutcome(CheckState.Advice, $"有 {faulty.Count} 個裝置發生問題",
                 string.Join("；", faulty.Take(3).Select(d => $"{d.Name}：{d.Reason}，{d.NextStep}")) + (faulty.Count > 3 ? $"；另有 {faulty.Count - 3} 個" : ""));
+    }, ct);
+
+    private Task<CheckOutcome> ScanStabilityAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("讀取最近 30 天的 Windows 事件記錄");
+        var report = StabilityReader.Read();
+        if (!report.Readable) return new CheckOutcome(CheckState.Advice, "無法讀取 Windows 事件記錄");
+        var crashes = report.ProgramCrashes.Count > 0 ? $"程式當機 {HealthText.ProgramCrashes(report)}" : null;
+        return report.HasSystemProblems
+            ? new CheckOutcome(CheckState.Advice, $"最近 30 天有 {HealthText.SystemProblems(report)}",
+                "經常發生時請備份資料，並把「電腦資訊」或健檢報告交給資訊人員" + (crashes is null ? "" : $"；{crashes}"))
+            : new CheckOutcome(CheckState.Good, "最近 30 天沒有藍色畫面、不正常關機或磁碟錯誤", crashes);
+    }, ct);
+
+    private Task<CheckOutcome> ScanSecuritySettingsAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("讀取防火牆、使用者帳戶控制、遠端桌面等設定");
+        var concerns = SecurityChecks.Read(_services.IsElevated, isLaptop: BatteryReader.Read().Count > 0)
+            .Where(s => s.Result is Core.Network.DiagnosisResult.Warning or Core.Network.DiagnosisResult.Fail).ToList();
+        return concerns.Count == 0
+            ? new CheckOutcome(CheckState.Good, "防火牆、使用者帳戶控制等設定正常")
+            : new CheckOutcome(CheckState.Advice, $"有 {concerns.Count} 項安全性設定建議調整",
+                string.Join("；", concerns.Select(c => $"{c.Title}：{c.Detail}")));
     }, ct);
 
     private Task<CheckOutcome> ScanRestartAsync(CancellationToken ct) => Task.Run(() =>
