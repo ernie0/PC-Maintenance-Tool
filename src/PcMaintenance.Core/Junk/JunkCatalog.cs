@@ -130,6 +130,18 @@ public static class JunkCatalog
             },
             new()
             {
+                Id = "delivery-optimization",
+                Name = "傳遞最佳化快取",
+                Description = "Windows 更新與商店 App 下載後留著分享給其他電腦的檔案，需要時會重新下載",
+                RequiresAdmin = true,
+                Locations =
+                [
+                    new(Path.Combine(folders.WindowsDir, "ServiceProfiles", "NetworkService", "AppData", "Local", "Microsoft", "Windows",
+                        "DeliveryOptimization", "Cache")),
+                ],
+            },
+            new()
+            {
                 Id = "recycle-bin",
                 Name = "資源回收筒",
                 Description = "清空所有磁碟的資源回收筒，清空後無法復原",
@@ -137,6 +149,23 @@ public static class JunkCatalog
                 IsRecycleBin = true,
             },
         ]);
+
+        // Left behind by a feature update; listed only where there is one.
+        var previousWindows = Path.Combine(Path.GetDirectoryName(folders.WindowsDir) ?? folders.WindowsDir, "Windows.old");
+        if (Directory.Exists(previousWindows))
+        {
+            categories.Insert(categories.FindIndex(c => c.IsRecycleBin), new()
+            {
+                Id = "windows-old",
+                Name = "舊版 Windows（Windows.old）",
+                Description = "Windows 大版本更新後保留的舊系統，用來退回之前的版本；由 Windows 的磁碟清理移除",
+                RequiresAdmin = true,
+                DefaultSelected = false,
+                DiskCleanupHandler = "Previous Installations",
+                ConfirmNote = "移除舊版 Windows 後，就不能再退回更新前的 Windows 版本。",
+                Locations = [new(previousWindows, ApplyAgeFilter: false)],
+            });
+        }
 
         return categories
             .Where(c => !settings.DisabledJunkCategories.Contains(c.Id, StringComparer.OrdinalIgnoreCase))

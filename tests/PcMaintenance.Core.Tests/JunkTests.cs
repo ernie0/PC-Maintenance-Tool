@@ -179,4 +179,44 @@ public class JunkTests
         Assert.DoesNotContain(catalog, c => c.Id == "windows-update-cache");
         Assert.False(Assert.Single(catalog, c => c.IsRecycleBin).DefaultSelected);
     }
+
+    [Fact]
+    public void A_previous_windows_is_offered_only_where_there_is_one_and_never_by_default()
+    {
+        using var temp = new TempDir();
+        var folders = temp.Folders();
+        Assert.DoesNotContain(JunkCatalog.Create(AppSettings.Default, folders), c => c.Id == "windows-old");
+
+        temp.Dir("Windows.old");
+        var catalog = JunkCatalog.Create(AppSettings.Default, folders);
+        var previous = Assert.Single(catalog, c => c.Id == "windows-old");
+        Assert.False(previous.DefaultSelected);
+        Assert.True(previous.RequiresAdmin);
+        Assert.Equal("Previous Installations", previous.DiskCleanupHandler);
+        Assert.Contains("不能再退回", previous.ConfirmNote);
+        Assert.Equal(Path.Combine(temp.Path, "Windows.old"), Assert.Single(previous.Locations).Path);
+        // The delivery optimization cache is an ordinary category, cleaned file by file with the age limit.
+        var delivery = Assert.Single(catalog, c => c.Id == "delivery-optimization");
+        Assert.Null(delivery.DiskCleanupHandler);
+        Assert.True(Assert.Single(delivery.Locations).ApplyAgeFilter);
+    }
+
+    [Fact]
+    public void Folders_left_to_windows_disk_cleanup_are_measured_whole_without_following_junctions()
+    {
+        using var temp = new TempDir();
+        var root = temp.Dir("Windows.old");
+        temp.File(@"Windows.old\Windows\a.bin", 100);
+        temp.File(@"Windows.old\Users\b.bin", 50);
+        var outside = temp.Dir("Users");
+        temp.File(@"Users\keep.bin", 1000);
+        temp.Junction(@"Windows.old\Documents and Settings", outside);
+        var category = Category(root, applyAge: false) with { DiskCleanupHandler = "Previous Installations", RequiresAdmin = true };
+
+        var scan = Scanner().Scan(category, isElevated: true);
+        Assert.Equal(150, scan.TotalBytes);
+        Assert.Equal(2, scan.ItemCount);
+        Assert.Empty(scan.Files);
+        Assert.False(Scanner().Scan(category, isElevated: false).CanClean);
+    }
 }

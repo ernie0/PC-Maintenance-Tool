@@ -11,7 +11,8 @@
   // crash-dumps 程式當機傾印檔        user-error-reports 錯誤報告（使用者） system-error-reports 錯誤報告（系統）
   // shader-cache 顯示卡著色器快取     system-crash-dumps 系統當機傾印檔
   // thumbnail-cache 縮圖快取          recent-items 最近使用的項目
-  // windows-update-cache Windows 更新下載快取                            recycle-bin 資源回收筒
+  // windows-update-cache Windows 更新下載快取                            delivery-optimization 傳遞最佳化快取
+  // windows-old 舊版 Windows（Windows.old，只在有這個資料夾的電腦出現）    recycle-bin 資源回收筒
   "disabledJunkCategories": [],
 
   // 永遠不刪除的資料夾（也包含重複檔移除），路徑中的 \ 要寫成 \\，例如 "D:\\公司資料"。

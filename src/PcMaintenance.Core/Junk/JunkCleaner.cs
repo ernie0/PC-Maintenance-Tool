@@ -24,6 +24,20 @@ public sealed class JunkCleaner(AppSettings settings, FileLog? log = null, Func<
                 : new CleanResult { Note = "清空資源回收筒失敗" };
         }
 
+        if (category.DiskCleanupHandler is { } handler)
+        {
+            if (WindowsDiskCleanup.Run(handler, log) is { } problem) return new CleanResult { Note = problem };
+            var (leftBytes, leftFiles) = JunkScanner.Measure(category.Locations, ct);
+            var freedByWindows = Math.Max(0, scan.TotalBytes - leftBytes);
+            log?.Info($"清理「{category.Name}」（Windows 磁碟清理）：釋放 {ByteSize.Format(freedByWindows)}，剩下 {leftFiles} 個檔案");
+            return new CleanResult
+            {
+                Deleted = (int)Math.Clamp(scan.ItemCount - leftFiles, 0, int.MaxValue),
+                FreedBytes = freedByWindows,
+                Note = leftFiles > 0 ? $"Windows 磁碟清理留下 {leftFiles:N0} 個檔案（{ByteSize.Format(leftBytes)}）" : null,
+            };
+        }
+
         var blocking = category.BlockingProcesses.FirstOrDefault(_isProcessRunning);
         if (blocking is not null) return new CleanResult { Note = $"{category.BlockingAppName ?? blocking} 正在執行，已略過" };
 

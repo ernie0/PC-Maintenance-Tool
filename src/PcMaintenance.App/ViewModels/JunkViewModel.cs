@@ -92,14 +92,15 @@ public sealed partial class JunkViewModel : PageViewModel
         var items = targets.Sum(t => t.Result!.ItemCount);
         var bytes = targets.Sum(t => t.Result!.TotalBytes);
         var names = string.Join("、", targets.Select(t => t.Name));
-        if (!Dialogs.Confirm($"即將清理：{names}\n\n共 {items:N0} 個項目，約 {ByteSize.Format(bytes)}。刪除後無法復原，確定要清理嗎？", "確認清理"))
+        var notes = string.Concat(targets.Select(t => t.Category.ConfirmNote).OfType<string>().Select(n => $"\n\n{n}"));
+        if (!Dialogs.Confirm($"即將清理：{names}\n\n共 {items:N0} 個項目，約 {ByteSize.Format(bytes)}。刪除後無法復原，確定要清理嗎？{notes}", "確認清理"))
             return;
 
         var cts = Begin();
         var cleaner = new JunkCleaner(_services.Settings, _services.Log);
         long freed = 0;
         int deleted = 0, skipped = 0;
-        var notes = new List<string>();
+        var results = new List<string>();
         try
         {
             foreach (var row in targets)
@@ -110,12 +111,12 @@ public sealed partial class JunkViewModel : PageViewModel
                 freed += result.FreedBytes;
                 deleted += result.Deleted;
                 skipped += result.TotalSkipped;
-                if (result.Note is not null) notes.Add($"{row.Name}：{result.Note}");
+                if (result.Note is not null) results.Add($"{row.Name}：{result.Note}");
             }
         }
         catch (OperationCanceledException)
         {
-            notes.Add("已取消，其餘項目未清理。");
+            results.Add("已取消，其餘項目未清理。");
         }
         finally
         {
@@ -124,7 +125,7 @@ public sealed partial class JunkViewModel : PageViewModel
 
         var summary = $"已刪除 {deleted:N0} 個項目，釋放 {ByteSize.Format(freed)}。";
         if (skipped > 0) summary += $"略過 {skipped:N0} 個使用中、已變更或沒有權限的檔案。";
-        if (notes.Count > 0) summary += "\n" + string.Join("\n", notes);
+        if (results.Count > 0) summary += "\n" + string.Join("\n", results);
         SummaryText = summary;
         HasCleaned = true;
     }
@@ -203,6 +204,8 @@ public sealed partial class JunkCategoryRow : ObservableObject
         "crash-dumps" or "system-crash-dumps" => "",
         "user-error-reports" or "system-error-reports" => "",
         "windows-update-cache" => "",
+        "delivery-optimization" => "\uE8AB",
+        "windows-old" => "\uE81C",
         "recycle-bin" => "",
         _ => "",
     };

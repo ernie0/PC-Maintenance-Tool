@@ -18,6 +18,15 @@ public sealed record JunkCategory
     /// <summary>Process names (without .exe) that keep these files in use; cleaning waits until none run.</summary>
     public IReadOnlyList<string> BlockingProcesses { get; init; } = [];
     public string? BlockingAppName { get; init; }
+
+    /// <summary>
+    /// Cleaned by the Windows Disk Cleanup handler of this name (a key under VolumeCaches) instead of file by file, for
+    /// folders only Windows may remove; the locations are then only measured.
+    /// </summary>
+    public string? DiskCleanupHandler { get; init; }
+
+    /// <summary>Repeated in the confirmation when this category is about to be cleaned.</summary>
+    public string? ConfirmNote { get; init; }
 }
 
 public sealed record JunkFile(string Path, long Size, DateTime LastWriteUtc, string Root);

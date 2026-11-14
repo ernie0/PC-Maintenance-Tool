@@ -22,6 +22,12 @@ public sealed class JunkScanner(AppSettings settings, Func<string, bool>? isProc
             return new JunkScanResult { Category = category, TotalBytes = bytes, ItemCount = items };
         }
 
+        if (category.DiskCleanupHandler is not null)
+        {
+            var (size, count) = Measure(category.Locations, ct, progress);
+            return new JunkScanResult { Category = category, TotalBytes = size, ItemCount = count };
+        }
+
         var cutoff = DateTime.UtcNow.AddHours(-settings.MinFileAgeHours);
         var files = new List<JunkFile>();
         var read = new ReadCount(progress);
@@ -57,6 +63,38 @@ public sealed class JunkScanner(AppSettings settings, Func<string, bool>? isProc
             Warning = warning,
             CanClean = blocking is null,
         };
+    }
+
+    /// <summary>Size and file count of whole folders, without keeping the file list (Windows.old holds hundreds of thousands).</summary>
+    public static (long Bytes, long Files) Measure(IEnumerable<JunkLocation> locations, CancellationToken ct = default, Action<JunkScanProgress>? progress = null)
+    {
+        long bytes = 0, files = 0;
+        var nextReport = Environment.TickCount64 + ProgressIntervalMs;
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        foreach (var location in locations)
+        {
+            if (!Directory.Exists(location.Path) || PathSafety.IsReparsePoint(location.Path)) continue;
+            try
+            {
+                var sizes = new FileSystemEnumerable<long>(location.Path, (ref FileSystemEntry e) => e.Length, options)
+                {
+                    ShouldIncludePredicate = (ref FileSystemEntry e) => !e.IsDirectory,
+                };
+                foreach (var size in sizes)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    bytes += size;
+                    files++;
+                    if (progress is null || Environment.TickCount64 < nextReport) continue;
+                    nextReport = Environment.TickCount64 + ProgressIntervalMs;
+                    progress(new JunkScanProgress((int)Math.Min(files, int.MaxValue), (int)Math.Min(files, int.MaxValue)));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+        return (bytes, files);
     }
 
     private static IEnumerable<string> MatchingNames(string folder, string pattern)
