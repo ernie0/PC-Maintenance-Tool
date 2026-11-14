@@ -45,7 +45,7 @@ public sealed record FleetSoftwareRow(FleetSoftware Software)
     public int Outdated => Software.Outdated;
     public string OutdatedText => Software.Outdated > 0 ? $"{Software.Outdated} 台" : "";
     public bool IsExtension => Software.Kind != FleetSoftwareList.SoftwareKind;
-    public string Tooltip => $"版本：{Software.VersionsText}";
+    public string Tooltip => (Software.Publisher.Length > 0 ? $"{(IsExtension ? "來源" : "發行者")}：{Software.Publisher}\n" : "") + $"版本：{Software.VersionsText}";
 
     public bool Matches(string text) =>
         Name.Contains(text, StringComparison.CurrentCultureIgnoreCase) ||
@@ -127,11 +127,12 @@ public sealed partial class FleetViewModel : PageViewModel
     private FleetSoftwareRow? _selectedSoftware;
 
     public bool HasFolder => Folder.Length > 0;
+    public bool HasComputers => Rows.Count > 0;
 
     public string DetailText => SelectedRow is not { } row ? "" :
         $"{row.Name}：{row.ConcernText}" + (row.Computer.Trend is { } trend ? $"　磁碟用量：{trend}" : "") + $"　（{Path.GetFileName(row.Computer.SourceFile)}）";
 
-    public string InstallsTitle => SelectedSoftware is not { } s ? "選取上方的軟體，這裡會列出裝在哪幾台電腦" : $"{s.Name}：{s.Software.VersionsText}";
+    public string InstallsTitle => SelectedSoftware is not { } s ? "選取左邊的軟體，這裡會列出裝在哪幾台電腦。" : $"{s.Name}\n{s.Software.VersionsText}";
 
     partial void OnOnlyAttentionChanged(bool value) => RowsView.Refresh();
     partial void OnSoftwareSearchChanged(string value) => SoftwareView.Refresh();
@@ -179,6 +180,7 @@ public sealed partial class FleetViewModel : PageViewModel
             var load = await Task.Run(() => FleetSummary.Load(folder, now));
             Rows.Clear();
             foreach (var computer in load.Computers) Rows.Add(new FleetRow(computer, now));
+            OnPropertyChanged(nameof(HasComputers));
             SoftwareRows.Clear();
             foreach (var software in load.SoftwareList) SoftwareRows.Add(new FleetSoftwareRow(software));
             _loaded = true;

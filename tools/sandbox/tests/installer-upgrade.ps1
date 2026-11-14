@@ -1,5 +1,5 @@
 ﻿# 安裝檔：靜默安裝舊版（帶公司設定檔與自動清理）→ 靜默升級到新版 → 確認版本、設定、自動清理、說明書
-# → 用裝好的程式跑命令列匯出、開畫面 → 靜默解除安裝。
+# → 再加上定期匯出重裝一次 → 用裝好的程式跑命令列匯出、開畫面 → 靜默解除安裝。
 # 需要 Run-SandboxTest.ps1 -Installers <資料夾>，資料夾裡放兩個完整版安裝檔（PcMaintenance-Setup-<版本>.exe）。
 . (Join-Path $PSScriptRoot 'common.ps1')
 $installers = 'C:\pcm\installers'
@@ -40,7 +40,13 @@ try {
   Check '升級後自動清理還在' ([bool](Get-ItemProperty $run -Name PcMaintenanceAutoClean -ErrorAction SilentlyContinue))
   $manual = Get-Item (Join-Path $app '使用說明書.pdf') -ErrorAction SilentlyContinue
   Log "  說明書：$(if ($manual) { '{0:N0} bytes' -f $manual.Length } else { '沒有' })；開始功能表捷徑：$(@(Get-ChildItem "$env:ProgramData\Microsoft\Windows\Start Menu\Programs" -Filter '電腦維護工具*.lnk').Name -join '、')"
-  Check '設定範例已更新成新版' ((Get-Content (Join-Path $programData 'settings.example.json') -Raw) -like '*delivery-optimization*')
+  Check '設定範例已更新成新版' ((Get-Content (Join-Path $programData 'settings.example.json') -Raw) -like '*inventoryIntervalDays*')
+
+  # Turning on the logon export afterwards, the way IT would with a second silent run.
+  $code = Setup $new.FullName "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TASKS=`"autoclean,autoexport`" /LOG=`"$(Join-Path $script:out 'install-autoexport.log')`""
+  $autoExport = (Get-ItemProperty $run -Name PcMaintenanceAutoExport -ErrorAction SilentlyContinue).PcMaintenanceAutoExport
+  Check '加上定期匯出重裝：登入時執行 --auto-export' ($code -eq 0 -and $autoExport -eq "`"$app\PcMaintenance.exe`" --auto-export" -and
+    [bool](Get-ItemProperty $run -Name PcMaintenanceAutoClean -ErrorAction SilentlyContinue)) "結束代碼 $code，$autoExport"
 
   $reports = Join-Path $script:out 'reports'
   New-Item -ItemType Directory -Force $reports | Out-Null
@@ -60,7 +66,8 @@ try {
   $code = Setup (Join-Path $app 'unins000.exe') '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
   Start-Sleep -Seconds 5
   Check '靜默解除安裝' ($code -eq 0 -and -not (Installed) -and -not (Test-Path $exe)) "結束代碼 $code"
-  Check '解除安裝後自動清理已移除' (-not (Get-ItemProperty $run -Name PcMaintenanceAutoClean -ErrorAction SilentlyContinue))
+  Check '解除安裝後自動清理與定期匯出已移除' (-not (Get-ItemProperty $run -Name PcMaintenanceAutoClean -ErrorAction SilentlyContinue) -and
+    -not (Get-ItemProperty $run -Name PcMaintenanceAutoExport -ErrorAction SilentlyContinue))
   Check '解除安裝後公司設定檔保留' (Test-Path (Join-Path $programData 'settings.json'))
 }
 catch {

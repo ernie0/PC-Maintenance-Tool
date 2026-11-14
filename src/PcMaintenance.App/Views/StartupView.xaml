@@ -64,8 +64,8 @@
                     <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
                     <DataGridTextColumn Header="類型" Binding="{Binding SourceText}" Width="110" ElementStyle="{StaticResource CellText}" />
                     <DataGridTextColumn Header="發行者" Binding="{Binding PublisherText}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
-                    <DataGridTextColumn Header="說明" Binding="{Binding DetailText}" Width="1.2*" ElementStyle="{StaticResource CellText}" />
-                    <DataGridTextColumn Header="需要注意" Binding="{Binding AttentionText}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="說明" Binding="{Binding DetailText}" Width="1*" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="需要注意" Binding="{Binding AttentionText}" Width="1.7*" ElementStyle="{StaticResource CellText}" />
                 </DataGrid.Columns>
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">

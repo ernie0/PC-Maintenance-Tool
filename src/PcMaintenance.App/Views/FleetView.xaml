@@ -33,20 +33,22 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <DockPanel Margin="0,0,0,10">
-                        <StackPanel DockPanel.Dock="Left" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <CheckBox Content="只顯示需要注意的電腦" IsChecked="{Binding OnlyAttention}" />
-                            <Button Content="匯出彙整表" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="0,8,0,0" HorizontalAlignment="Left"
+                    <StackPanel Margin="0,0,0,10">
+                        <DockPanel LastChildFill="False">
+                            <CheckBox DockPanel.Dock="Left" Content="只顯示需要注意的電腦" IsChecked="{Binding OnlyAttention}" VerticalAlignment="Center" />
+                            <Button DockPanel.Dock="Right" Content="匯出彙整表" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}"
                                     local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="一台電腦一列，含需要注意的事項與磁碟用量趨勢，可以用 Excel 開啟" />
-                        </StackPanel>
-                        <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,6">
+                        </DockPanel>
+                        <!-- How to fill the folder matters only while it is empty. -->
+                        <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,6" Margin="0,10,0,0"
+                                Visibility="{Binding HasComputers, Converter={StaticResource InverseBoolToVisibility}}">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Left" Text="&#xE946;" Style="{StaticResource IconText}" FontSize="15" Foreground="{StaticResource AccentBrush}"
                                            VerticalAlignment="Top" Margin="0,1,10,0" />
                                 <TextBlock Text="{x:Static vm:FleetViewModel.HowToCollect}" TextWrapping="Wrap" FontSize="13" />
                             </DockPanel>
                         </Border>
-                    </DockPanel>
+                    </StackPanel>
 
                     <ContentControl Grid.Row="1" Style="{StaticResource Card}">
                         <DataGrid ItemsSource="{Binding RowsView}" SelectedItem="{Binding SelectedRow}" EnableRowVirtualization="True" AutomationProperties.Name="各台電腦">
@@ -81,57 +83,62 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="2*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" MinHeight="90" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel Margin="0,0,0,8" LastChildFill="False">
-                        <TextBox DockPanel.Dock="Left" Width="220" Text="{Binding SoftwareSearch, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox DockPanel.Dock="Left" Width="200" Text="{Binding SoftwareSearch, UpdateSourceTrigger=PropertyChanged}"
                                  Tag="搜尋軟體、發行者或電腦" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋軟體" />
                         <ComboBox DockPanel.Dock="Left" ItemsSource="{Binding SoftwareKinds}" SelectedItem="{Binding SelectedSoftwareKind}" DisplayMemberPath="Label"
-                                  Width="150" Margin="8,0,0,0" AutomationProperties.Name="類型" />
-                        <CheckBox DockPanel.Dock="Left" Content="只看有電腦還是舊版的" IsChecked="{Binding OnlyMixedVersions}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                                  Width="140" Margin="8,0,0,0" AutomationProperties.Name="類型" />
+                        <CheckBox DockPanel.Dock="Left" Content="只看有舊版的" IsChecked="{Binding OnlyMixedVersions}" Margin="12,0,0,0" VerticalAlignment="Center" />
                         <Button DockPanel.Dock="Right" Content="匯出軟體彙整" Command="{Binding ExportSoftwareCommand}" Style="{StaticResource SecondaryButton}"
                                 local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="一個軟體一列：裝在幾台、版本分佈、哪幾台還是舊版" />
                     </DockPanel>
                     <TextBlock Grid.Row="1" Text="{Binding SoftwareSummary}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,0,0,8" />
-                    <ContentControl Grid.Row="2" Style="{StaticResource Card}">
-                        <DataGrid ItemsSource="{Binding SoftwareView}" SelectedItem="{Binding SelectedSoftware}" EnableRowVirtualization="True" AutomationProperties.Name="軟體與擴充功能">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="類型" Binding="{Binding Kind}" Width="112" ElementStyle="{StaticResource CellText}" />
-                                <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" MinWidth="140" ElementStyle="{StaticResource CellText}" />
-                                <DataGridTextColumn Header="發行者／來源" Binding="{Binding Publisher}" Width="1.2*" MinWidth="100" ElementStyle="{StaticResource CellText}" />
-                                <DataGridTextColumn Header="電腦數" Binding="{Binding Computers}" Width="72" ElementStyle="{StaticResource CellTextRight}" />
-                                <DataGridTextColumn Header="最新版本" Binding="{Binding Newest}" Width="112" ElementStyle="{StaticResource CellText}" />
-                                <DataGridTextColumn Header="還是舊版" Binding="{Binding OutdatedText}" SortMemberPath="Outdated" Width="84" ElementStyle="{StaticResource CellTextRight}" />
-                            </DataGrid.Columns>
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                    <Setter Property="ToolTip" Value="{Binding Tooltip}" />
-                                </Style>
-                            </DataGrid.RowStyle>
-                        </DataGrid>
-                    </ContentControl>
-                    <TextBlock Grid.Row="3" Text="{Binding InstallsTitle}" Style="{StaticResource SubtleText}" TextTrimming="CharacterEllipsis" Margin="0,10,0,6"
-                               ToolTip="{Binding InstallsTitle}" />
-                    <ContentControl Grid.Row="4" Style="{StaticResource Card}">
-                        <DataGrid ItemsSource="{Binding InstallRows}" EnableRowVirtualization="True" AutomationProperties.Name="安裝的電腦">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="電腦名稱" Binding="{Binding Computer}" Width="1*" ElementStyle="{StaticResource CellText}" />
-                                <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="1*" ElementStyle="{StaticResource CellText}" />
-                            </DataGrid.Columns>
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsOutdated}" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
-                                            <Setter Property="ToolTip" Value="比其他電腦的版本舊" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGrid.RowStyle>
-                        </DataGrid>
-                    </ContentControl>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="260" />
+                        </Grid.ColumnDefinitions>
+                        <ContentControl Style="{StaticResource Card}">
+                            <DataGrid ItemsSource="{Binding SoftwareView}" SelectedItem="{Binding SelectedSoftware}" EnableRowVirtualization="True" AutomationProperties.Name="軟體與擴充功能">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" MinWidth="120" ElementStyle="{StaticResource CellText}" />
+                                    <DataGridTextColumn Header="類型" Binding="{Binding Kind}" Width="1*" MinWidth="64" ElementStyle="{StaticResource CellText}" />
+                                    <DataGridTextColumn Header="電腦數" Binding="{Binding Computers}" Width="68" MinWidth="56" ElementStyle="{StaticResource CellTextRight}" />
+                                    <DataGridTextColumn Header="最新版本" Binding="{Binding Newest}" Width="1*" MinWidth="72" ElementStyle="{StaticResource CellText}" />
+                                    <DataGridTextColumn Header="還是舊版" Binding="{Binding OutdatedText}" SortMemberPath="Outdated" Width="84" MinWidth="64" ElementStyle="{StaticResource CellTextRight}" />
+                                </DataGrid.Columns>
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                    </Style>
+                                </DataGrid.RowStyle>
+                            </DataGrid>
+                        </ContentControl>
+                        <ContentControl Grid.Column="2" Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="{Binding InstallsTitle}" TextWrapping="Wrap" Margin="12,10,12,8" />
+                                <DataGrid ItemsSource="{Binding InstallRows}" EnableRowVirtualization="True" AutomationProperties.Name="安裝的電腦">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="電腦名稱" Binding="{Binding Computer}" Width="1.2*" ElementStyle="{StaticResource CellText}" />
+                                        <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="1*" ElementStyle="{StaticResource CellText}" />
+                                    </DataGrid.Columns>
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOutdated}" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+                                                    <Setter Property="ToolTip" Value="比其他電腦的版本舊" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                </DataGrid>
+                            </DockPanel>
+                        </ContentControl>
+                    </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

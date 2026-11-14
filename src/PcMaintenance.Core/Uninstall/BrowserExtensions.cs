@@ -89,15 +89,17 @@ public static class BrowserExtensions
             enabled = stateValue == 1;
 
         var updateUrl = manifest is { } mu && mu.TryGetProperty("update_url", out var u) ? u.GetString() ?? "" : "";
+        // Another program may add a store extension (location 6, e.g. Google Docs Offline); it still comes from the store.
+        var added = location == Internal ? "" : "（由其他程式加入）";
         var (source, fromStore) = location switch
         {
             PolicyDownload or Policy => ("公司原則安裝", true),
             Unpacked => ("開發人員模式載入（非商店）", false),
-            Internal when updateUrl.Contains("edge.microsoft.com", StringComparison.OrdinalIgnoreCase) => ("Edge 附加元件商店", true),
-            Internal when updateUrl.Contains("google.com", StringComparison.OrdinalIgnoreCase) => ("Chrome 線上應用程式商店", true),
-            Internal when s.TryGetProperty("from_webstore", out var w) && w.ValueKind == JsonValueKind.True => ("Chrome 線上應用程式商店", true),
+            _ when updateUrl.Contains("edge.microsoft.com", StringComparison.OrdinalIgnoreCase) => ($"Edge 附加元件商店{added}", true),
+            _ when updateUrl.Contains("google.com", StringComparison.OrdinalIgnoreCase) ||
+                   (s.TryGetProperty("from_webstore", out var w) && w.ValueKind == JsonValueKind.True) => ($"Chrome 線上應用程式商店{added}", true),
             Internal => ("非商店來源", false),
-            _ => ("其他程式安裝", false),
+            _ => ("其他程式安裝（非商店）", false),
         };
         return new BrowserExtension(browser, profile, id, name, version, enabled, source, fromStore);
     }

@@ -9,17 +9,23 @@ namespace PcMaintenance.Core.Startup;
 /// </summary>
 public static class StartupRisk
 {
-    public static string? Describe(StartupItem item, FileSignature? signature, IReadOnlyList<(string Folder, string Name)> riskyFolders)
+    public static string? Describe(StartupItem item, FileSignature? signature, IReadOnlyList<(string Folder, string Name)> riskyFolders, string? windowsFolder = null)
     {
         var notes = new List<string>();
         if (item.ExecutablePath is { Length: > 0 } path)
         {
             if (riskyFolders.FirstOrDefault(f => PathSafety.IsSameOrUnder(f.Folder, path)) is { Name: { } folder })
                 notes.Add($"從{folder}執行");
+            // Windows' own files are signed through catalogs that a damaged or partial catalog database cannot find, and
+            // only an administrator can place a file there; so inside the Windows folder only a foreign signer counts.
+            windowsFolder ??= Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            var inWindows = windowsFolder.Length > 0 && PathSafety.IsSameOrUnder(windowsFolder, path);
             switch (signature?.State)
             {
                 case SignatureState.Valid when item.IsMicrosoft && !signature.IsMicrosoft:
                     notes.Add($"標示為 Microsoft，但數位簽章是「{signature.Signer}」");
+                    break;
+                case SignatureState.Unsigned or SignatureState.Invalid when item.IsMicrosoft && inWindows:
                     break;
                 case SignatureState.Unsigned or SignatureState.Invalid when item.IsMicrosoft:
                     notes.Add("標示為 Microsoft，但沒有有效的 Microsoft 數位簽章");

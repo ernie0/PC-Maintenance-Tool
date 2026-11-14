@@ -129,6 +129,9 @@ public class UpgradeAndBackupTests
         Assert.Equal("標示為 Microsoft，但沒有有效的 Microsoft 數位簽章",
             StartupRisk.Describe(Item(@"C:\x\svc.exe", microsoft: true), new FileSignature(SignatureState.Invalid, ""), risky));
         Assert.Equal("數位簽章無效", StartupRisk.Describe(Item(@"C:\x\a.exe"), new FileSignature(SignatureState.Invalid, "A"), risky));
+        // Inside the Windows folder an unfound catalog signature is not called out; a foreign signer still is.
+        Assert.Null(StartupRisk.Describe(Item(@"C:\Windows\SysWOW64\perfhost.exe", microsoft: true), new FileSignature(SignatureState.Unsigned, ""), risky, @"C:\Windows"));
+        Assert.NotNull(StartupRisk.Describe(Item(@"C:\Windows\svc.exe", microsoft: true), valid, risky, @"C:\Windows"));
         Assert.Null(StartupRisk.Describe(Item(@"C:\x\a.exe"), FileSignature.Unknown, risky));
         Assert.NotEmpty(StartupRisk.RiskyFolders());
     }
