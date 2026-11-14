@@ -26,6 +26,7 @@ public static class PcmWin {
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr dialog, int id);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder text, int max);
 }
 "@
 $script:AE = [System.Windows.Automation.AutomationElement]
@@ -85,7 +86,9 @@ function Confirm-Dialog([string]$title, [string]$shot) {
   if (-not $dialog) { $dialog = Wait-Until { $AE::RootElement.FindFirst($Scope::Children, (Cond $title $CT::Window)) } 5 }
   if (-not $dialog) { throw "沒有出現「$title」確認視窗" }
   $dh = [IntPtr]$dialog.Current.NativeWindowHandle
-  $text = (Texts ($AE::FromHandle($dh))) -join ' '
+  $buffer = New-Object System.Text.StringBuilder 2048
+  [PcmWin]::GetWindowText([PcmWin]::GetDlgItem($dh, 0xFFFF), $buffer, $buffer.Capacity) | Out-Null
+  $text = $buffer.ToString()
   if ($shot) { Shot $shot $dh }
   [PcmWin]::SendMessage([PcmWin]::GetDlgItem($dh, 1), 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
   return $text

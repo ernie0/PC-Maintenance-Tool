@@ -42,20 +42,35 @@ $config = Join-Path $work 'test.wsb'
 </Configuration>
 "@ | Set-Content $config -Encoding utf8
 
+# The sandbox window sometimes loses its connection before anyone signs in ("與 Windows 沙箱環境的連線已中斷。是否要重新連線?")
+# and then waits forever; its 重新連線 (Reconnect) button brings the session back and the sign-in goes ahead.
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+function Invoke-Reconnect {
+  foreach ($p in Get-Process WindowsSandboxRemoteSession -ErrorAction SilentlyContinue) {
+    if ($p.MainWindowHandle -eq 0) { continue }
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+    $buttons = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)))
+    $button = $buttons | Where-Object { $_.Current.Name -in '重新連線', 'Reconnect' } | Select-Object -First 1
+    if ($button) { $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); return $true }
+  }
+  return $false
+}
+
 function Stop-Sandboxes {
   foreach ($id in ((wsb list 2>&1 | Out-String).Trim() -split '\s+' | Where-Object { $_ })) { wsb stop --id $id 2>&1 | Out-Null }
   Get-Process WindowsSandboxRemoteSession -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
-# The sandbox user sometimes never signs in on the first boot; after three minutes it is restarted, three times at most.
+# The sandbox user sometimes never signs in on the first boot; after five minutes it is restarted, three times at most.
 $log = Join-Path $out 'log.txt'
 $done = Join-Path $out 'DONE'
 for ($attempt = 1; $attempt -le 3; $attempt++) {
   Start-Process "$env:windir\System32\WindowsSandbox.exe" -ArgumentList ('"' + $config + '"')
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  while ($sw.Elapsed.TotalMinutes -lt 3 -and -not (Test-Path $log)) { Start-Sleep -Seconds 10 }
+  while ($sw.Elapsed.TotalMinutes -lt 5 -and -not (Test-Path $log)) { Start-Sleep -Seconds 10; if (Invoke-Reconnect) { '按了 Sandbox 視窗的「重新連線」' } }
   if (Test-Path $log) { break }
-  "第 $attempt 次：3 分鐘內沒有登入，關閉後重試"
+  "第 $attempt 次：5 分鐘內沒有登入，關閉後重試"
   Stop-Sandboxes
   Start-Sleep -Seconds 20
 }

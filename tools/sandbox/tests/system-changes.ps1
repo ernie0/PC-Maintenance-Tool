@@ -76,7 +76,10 @@ try {
   if ($console) { Shot-Console 'print-console' $console; Stop-Process -Id $console.ProcessId -Force -ErrorAction SilentlyContinue }
 
   # ── Clock: 10 minutes slow, found by the network check, fixed by the tool.
+  Stop-Service vmictimesync -Force -ErrorAction SilentlyContinue
   Set-Date (Get-Date).AddMinutes(-10) | Out-Null
+  Start-Sleep -Seconds 5
+  Log "  把時間調慢 10 分鐘後：$(Get-Date -Format 'HH:mm:ss')"
   Log "  診斷：$(Run-Diagnosis)"
   $clock = ClockLine
   Check '診斷發現電腦時間慢約 10 分鐘' ([bool]($clock -match '(9|10) 分.*電腦慢')) "$clock"
