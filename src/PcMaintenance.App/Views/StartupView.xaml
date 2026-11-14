@@ -17,6 +17,8 @@
             <Button DockPanel.Dock="Right" Content="重新整理" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                     local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshCommand.IsRunning}" />
             <CheckBox DockPanel.Dock="Right" Content="顯示 Microsoft 項目" IsChecked="{Binding ShowMicrosoft}" Margin="0,0,16,0" />
+            <CheckBox DockPanel.Dock="Right" Content="只看需要注意的" IsChecked="{Binding OnlyAttention}" Margin="0,0,16,0"
+                      ToolTip="從暫存或下載資料夾執行、沒有有效的數位簽章，或標示為 Microsoft 卻沒有 Microsoft 簽章的項目" />
         </DockPanel>
 
         <!-- The search box shares this row with the count so the filter row fits the narrowest window. -->
@@ -63,10 +65,16 @@
                     <DataGridTextColumn Header="類型" Binding="{Binding SourceText}" Width="110" ElementStyle="{StaticResource CellText}" />
                     <DataGridTextColumn Header="發行者" Binding="{Binding PublisherText}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
                     <DataGridTextColumn Header="說明" Binding="{Binding DetailText}" Width="1.2*" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="需要注意" Binding="{Binding AttentionText}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
                 </DataGrid.Columns>
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                         <Setter Property="ToolTip" Value="{Binding Command}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
                 </DataGrid.RowStyle>
             </DataGrid>
@@ -87,6 +95,10 @@
                                TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedItem.Description}" />
                     <TextBox Text="{Binding SelectedItem.Command, Mode=OneWay}" IsReadOnly="True" Margin="0,8,0,0" MinHeight="32"
                              AutomationProperties.Name="命令列" />
+                    <TextBlock Foreground="{StaticResource WarningTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding SelectedItem.NeedsAttention, Converter={StaticResource BoolToVisibility}}">
+                        <Run Text="{Binding SelectedItem.AttentionText, Mode=OneWay}" /><Run Text="。這不一定是惡意程式，但無法確認是誰發行的；不認得的項目可以先停用（可在「變更紀錄」還原），或把名稱與命令交給資訊人員判斷。" />
+                    </TextBlock>
                     <TextBlock Text="{Binding SelectionHint}" Foreground="{StaticResource WarningTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
                                Visibility="{Binding SelectionHint, Converter={StaticResource TextToVisibility}}" />
                 </StackPanel>

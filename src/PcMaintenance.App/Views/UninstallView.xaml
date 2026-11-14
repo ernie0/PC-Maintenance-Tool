@@ -206,5 +206,56 @@
                 </ContentControl>
             </Grid>
         </TabItem>
+
+        <TabItem Header="瀏覽器擴充功能" local:Glyph.Text="&#xEA86;" local:Glyph.Motion="Bounce">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                    <Button DockPanel.Dock="Left" Content="重新整理" Command="{Binding RefreshExtensionsCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding RefreshExtensionsCommand.IsRunning}" />
+                    <Button DockPanel.Dock="Left" Content="在瀏覽器中管理" Command="{Binding ManageExtensionCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE8A7;" ToolTip="開啟瀏覽器的擴充功能頁面，可以在那裡關閉或移除選取的擴充功能" />
+                    <Button DockPanel.Dock="Right" Content="匯出清單" Command="{Binding ExportExtensionsCommand}" Style="{StaticResource SecondaryButton}"
+                            local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="把擴充功能清單匯出成 CSV（可用 Excel 開啟）" />
+                    <CheckBox DockPanel.Dock="Right" Content="只看不是從商店安裝的" IsChecked="{Binding OnlyOutsideStore}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock Grid.Row="1" Text="{Binding ExtensionStatus}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                <Border Grid.Row="2" Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,8" Margin="0,0,0,10">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE946;" Style="{StaticResource IconText}" FontSize="15" Foreground="{StaticResource AccentBrush}"
+                                   VerticalAlignment="Top" Margin="0,1,10,0" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="列出目前這位使用者在 Chrome、Edge 與 Firefox 自己安裝的擴充功能（瀏覽器內建的元件不列出）。擴充功能可以讀取瀏覽的網頁內容，不認得的、不是從商店安裝的，請在瀏覽器中關閉或移除。這裡只讀取，不會變更瀏覽器設定。" />
+                    </DockPanel>
+                </Border>
+                <ContentControl Grid.Row="3" Style="{StaticResource Card}">
+                    <DataGrid ItemsSource="{Binding ExtensionRows}" SelectedItem="{Binding SelectedExtension}" EnableRowVirtualization="True" AutomationProperties.Name="瀏覽器擴充功能">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="瀏覽器" Binding="{Binding Browser}" Width="80" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" MinWidth="140" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="96" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="狀態" Binding="{Binding State}" Width="72" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="來源" Binding="{Binding Source}" Width="1.5*" MinWidth="120" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="設定檔" Binding="{Binding Profile}" Width="84" ElementStyle="{StaticResource CellText}" />
+                        </DataGrid.Columns>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding OutsideStore}" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+                </ContentControl>
+            </Grid>
+        </TabItem>
     </TabControl>
 </UserControl>

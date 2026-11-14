@@ -5,11 +5,13 @@ public enum CliAction
     None,
     Clean,
     AutoClean,
+    AutoExport,
     ExportSoftware,
     ExportStartup,
     ExportSystem,
     ExportConnections,
     ExportReport,
+    ExportExtensions,
     RestorePoint,
 }
 
@@ -20,11 +22,13 @@ public sealed record CliCommand(CliAction Action, bool DryRun = false, string? P
         可用參數：
           --clean [--dry-run]                  立即清理預設勾選的項目（--dry-run 只列出、不刪除）
           --auto-clean [--dry-run]             距離上次自動清理超過設定天數才清理
+          --auto-export                        把電腦配備、軟體清單與瀏覽器擴充功能存到公司設定的資料夾（inventoryFolder；依設定天數最多一次）
           --export-software <檔案或資料夾>      匯出軟體清單（CSV）
           --export-startup <檔案或資料夾>       匯出開機與背景項目（CSV）
           --export-system <檔案或資料夾>        匯出電腦配備與系統版本（CSV）
           --export-connections <檔案或資料夾>   匯出目前的網路連線與所屬程式（CSV；不查主機名稱）
           --export-report <檔案或資料夾>        匯出電腦健檢報告（可列印的網頁）
+          --export-extensions <檔案或資料夾>    匯出這個使用者的瀏覽器擴充功能（CSV）
           --restore-point                      建立系統還原點（需要系統管理員權限）
         """;
 
@@ -46,18 +50,21 @@ public sealed record CliCommand(CliAction Action, bool DryRun = false, string? P
             {
                 "--clean" => CliAction.Clean,
                 "--auto-clean" => CliAction.AutoClean,
+                "--auto-export" => CliAction.AutoExport,
                 "--export-software" => CliAction.ExportSoftware,
                 "--export-startup" => CliAction.ExportStartup,
                 "--export-system" => CliAction.ExportSystem,
                 "--export-connections" => CliAction.ExportConnections,
                 "--export-report" => CliAction.ExportReport,
+                "--export-extensions" => CliAction.ExportExtensions,
                 "--restore-point" => CliAction.RestorePoint,
                 _ => CliAction.None,
             };
             if (next == CliAction.None) return Fail($"無法辨識的參數：{args[i]}");
             if (action != CliAction.None) return Fail("一次只能指定一個動作");
             action = next;
-            if (action is CliAction.ExportSoftware or CliAction.ExportStartup or CliAction.ExportSystem or CliAction.ExportConnections or CliAction.ExportReport)
+            if (action is CliAction.ExportSoftware or CliAction.ExportStartup or CliAction.ExportSystem or CliAction.ExportConnections or CliAction.ExportReport
+                or CliAction.ExportExtensions)
             {
                 if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal))
                     return Fail($"{args[i]} 後面要接檔案或資料夾路徑");

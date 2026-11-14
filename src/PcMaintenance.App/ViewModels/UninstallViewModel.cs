@@ -23,13 +23,16 @@ public sealed partial class UninstallViewModel : PageViewModel
 
     public override string Title => "軟體解除安裝";
     public override string Subtitle =>
-        "執行程式本身的解除安裝程式，完成後檢查留下的資料夾與登錄機碼；也可以移除 Windows 內建與商店 App。殘留資料夾會移到資源回收筒，登錄機碼刪除前會先備份。";
+        "執行程式本身的解除安裝程式，完成後檢查留下的資料夾與登錄機碼；也可以移除 Windows 內建與商店 App、用 winget 更新軟體，以及檢查瀏覽器擴充功能。殘留資料夾會移到資源回收筒，登錄機碼刪除前會先備份。";
 
     public ObservableCollection<AppRow> Apps { get; } = [];
     public ObservableCollection<LeftoverRow> Leftovers { get; } = [];
     public ObservableCollection<StoreAppRow> StoreAppRows { get; } = [];
 
-    /// <summary>0 = desktop programs, 1 = built-in and Store apps (listed the first time the tab is opened), 2 = software updates.</summary>
+    /// <summary>
+    /// 0 = desktop programs, 1 = built-in and Store apps (listed the first time the tab is opened), 2 = software updates,
+    /// 3 = browser extensions (listed the first time the tab is opened).
+    /// </summary>
     [ObservableProperty]
     private int _selectedTab;
 
@@ -116,6 +119,94 @@ public sealed partial class UninstallViewModel : PageViewModel
     partial void OnSelectedTabChanged(int value)
     {
         if (value == 1 && !_storeLoaded && !IsStoreBusy) RefreshStoreAppsCommand.Execute(null);
+        if (value == 3 && !_extensionsLoaded && !IsExtensionBusy) RefreshExtensionsCommand.Execute(null);
+    }
+
+    private List<ExtensionRow> _allExtensions = [];
+    private bool _extensionsLoaded;
+
+    public ObservableCollection<ExtensionRow> ExtensionRows { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshExtensionsCommand), nameof(ExportExtensionsCommand))]
+    private bool _isExtensionBusy;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ManageExtensionCommand))]
+    private ExtensionRow? _selectedExtension;
+
+    [ObservableProperty]
+    private bool _onlyOutsideStore;
+
+    [ObservableProperty]
+    private string _extensionStatus = "";
+
+    partial void OnOnlyOutsideStoreChanged(bool value) => ShowExtensions();
+
+    /// <summary>Reads this user's Chrome, Edge and Firefox profiles; read only.</summary>
+    [RelayCommand(CanExecute = nameof(NotExtensionBusy))]
+    private async Task RefreshExtensionsAsync()
+    {
+        IsExtensionBusy = true;
+        ExtensionStatus = "正在讀取瀏覽器的擴充功能…";
+        try
+        {
+            var list = await Task.Run(BrowserExtensions.Read);
+            _allExtensions = list.Select(e => new ExtensionRow(e)).ToList();
+            _extensionsLoaded = true;
+            ShowExtensions();
+        }
+        finally
+        {
+            IsExtensionBusy = false;
+        }
+    }
+
+    private void ShowExtensions()
+    {
+        ExtensionRows.Clear();
+        foreach (var row in _allExtensions.Where(r => !OnlyOutsideStore || !r.Extension.FromStore)) ExtensionRows.Add(row);
+        var outside = _allExtensions.Count(r => !r.Extension.FromStore);
+        ExtensionStatus = _allExtensions.Count == 0
+            ? "這個使用者的 Chrome、Edge 與 Firefox 沒有安裝擴充功能。"
+            : $"共 {_allExtensions.Count} 個擴充功能（{string.Join("、", _allExtensions.GroupBy(r => r.Extension.Browser).Select(g => $"{g.Key} {g.Count()} 個"))}）" +
+              (outside > 0 ? $"，其中 {outside} 個不是從瀏覽器的商店安裝，請確認是否認得。" : "，都是從瀏覽器的商店或公司原則安裝。");
+    }
+
+    private bool NotExtensionBusy() => !IsExtensionBusy;
+    private bool CanExportExtensions() => !IsExtensionBusy && _extensionsLoaded;
+
+    /// <summary>Opens the browser's own extension page, where an extension is turned off or removed.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelectedExtension))]
+    private void ManageExtension()
+    {
+        if (SelectedExtension?.Extension is not { } e) return;
+        var profile = e.Profile == "預設" ? "Default" : e.Profile.Replace("設定檔 ", "Profile ", StringComparison.Ordinal);
+        var (exe, args) = e.Browser switch
+        {
+            BrowserExtensions.ChromeName => ("chrome.exe", $"--profile-directory=\"{profile}\" chrome://extensions/?id={e.Id}"),
+            BrowserExtensions.EdgeName => ("msedge.exe", $"--profile-directory=\"{profile}\" edge://extensions/?id={e.Id}"),
+            _ => ("firefox.exe", "about:addons"),
+        };
+        if (SystemActions.AppPath(exe) is not { } path || !SystemActions.Open(path, args))
+            Dialogs.Error($"找不到 {e.Browser}，請直接開啟瀏覽器的擴充功能頁面管理。");
+    }
+
+    private bool HasSelectedExtension() => SelectedExtension is not null;
+
+    [RelayCommand(CanExecute = nameof(CanExportExtensions))]
+    private void ExportExtensions()
+    {
+        if (Dialogs.AskCsvPath(InventoryExport.ExtensionsKind) is not { } path) return;
+        try
+        {
+            var count = InventoryExport.WriteExtensions(path, _allExtensions.Select(r => r.Extension), Environment.MachineName);
+            ExtensionStatus = $"已匯出 {count} 個擴充功能到 {path}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Dialogs.Error($"無法匯出：{UserMessage.For(ex)}");
+        }
     }
 
     [RelayCommand(CanExecute = nameof(NotStoreBusy))]
@@ -488,4 +579,16 @@ public sealed partial class LeftoverRow : ObservableObject
 
     [ObservableProperty]
     private string? _resultText;
+}
+
+public sealed record ExtensionRow(BrowserExtension Extension)
+{
+    public string Browser => Extension.Browser;
+    public string Name => Extension.Name;
+    public string Version => Extension.Version;
+    public string State => Extension.StateText;
+    public string Source => Extension.Source;
+    public string Profile => Extension.Profile;
+    public bool OutsideStore => !Extension.FromStore;
+    public string Tooltip => $"識別碼：{Extension.Id}";
 }

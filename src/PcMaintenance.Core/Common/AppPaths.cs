@@ -14,6 +14,7 @@ public static class AppPaths
     public static string LogDir => Path.Combine(UserDataDir, "logs");
     public static string BackupDir => Path.Combine(UserDataDir, "backups");
     public static string AutoCleanStateFile => Path.Combine(UserDataDir, "auto-clean.json");
+    public static string AutoExportStateFile => Path.Combine(UserDataDir, "auto-export.json");
     public static string MaintenanceStateFile => Path.Combine(UserDataDir, "maintenance.json");
     public static string MachineSettingsFile => Path.Combine(MachineDataDir, "settings.json");
 }

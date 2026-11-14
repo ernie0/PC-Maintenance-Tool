@@ -74,7 +74,9 @@ public sealed partial class MainViewModel : ObservableObject
     public string ElevationGlyph => Services.IsElevated ? "" : "";
     public string? SettingsWarning => Services.SettingsWarning;
     public string SettingsText => Services.SettingsSource is null ? "設定：預設值" : "設定：公司設定檔";
-    public string VersionText => $"版本 {typeof(MainViewModel).Assembly.GetName().Version?.ToString(3)}";
+    public static string AppVersion => typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "";
+
+    public string VersionText => $"版本 {AppVersion}";
 
     partial void OnSelectedPageChanged(NavItem? oldValue, NavItem newValue)
     {

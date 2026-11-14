@@ -26,9 +26,12 @@ public sealed record HealthReportData(
     bool RestartPending, TimeSpan Uptime, DateTime CreatedAt)
 {
     /// <summary>Reads everything the report shows; takes a few seconds.</summary>
-    public static HealthReportData Collect(bool isElevated) => new(
-        SystemInfoReader.Read(), ComputerHealth.Read(isElevated), BootPerformance.Read(), SecurityStatus.ReadAntivirus(),
-        RestartStatus.IsUpdateRestartPending(), RestartStatus.Uptime, DateTime.Now);
+    public static HealthReportData Collect(bool isElevated)
+    {
+        var info = SystemInfoReader.Read();
+        return new(info, ComputerHealth.Read(isElevated, info), BootPerformance.Read(), SecurityStatus.ReadAntivirus(),
+            RestartStatus.IsUpdateRestartPending(), RestartStatus.Uptime, DateTime.Now);
+    }
 }
 
 /// <summary>
@@ -45,6 +48,7 @@ public static class HealthReport
         var list = new List<string>();
         var h = d.Health;
         foreach (var disk in d.Info.Disks.Disks.Where(x => !x.IsHealthy)) list.Add($"磁碟「{disk.Model}」回報健康狀態{disk.Health}，請盡快備份資料");
+        if (h.Windows11?.Concern is { } windows) list.Add(windows);
         if (h.Stability.HasSystemProblems) list.Add($"最近 30 天有 {Problems(h.Stability)}");
         foreach (var f in h.Security.Where(s => s.Result == DiagnosisResult.Fail)) list.Add($"{f.Title}：{f.Detail}");
         switch (d.Antivirus)
@@ -60,6 +64,7 @@ public static class HealthReport
                 list.Add($"已經 {(int)(d.CreatedAt.Date - last.ToLocalTime().Date).TotalDays} 天沒有安裝 Windows 更新");
             if (h.Updates.Failures.Count > 0) list.Add($"最近有 {h.Updates.Failures.Count} 個 Windows 更新安裝失敗");
         }
+        if (h.Backup is { Read: true, AnyFound: false }) list.Add("沒有偵測到檔案備份（OneDrive 資料夾備份、檔案歷程記錄或備份軟體）");
         foreach (var v in d.Info.Disks.Volumes.Where(v => !v.IsRemovable && v.FreePercent < HealthLimits.LowFreePercent))
             list.Add($"{v.Letter}: 只剩 {v.FreePercent:0}% 空間");
         foreach (var device in h.Devices.Where(x => !x.IsDisabled)) list.Add($"裝置「{device.Name}」{device.Reason}");
@@ -135,7 +140,11 @@ public static class HealthReport
             ("防毒軟體", d.Antivirus is null ? "無法讀取" : d.Antivirus.Count == 0 ? "找不到" :
                 string.Join("；", d.Antivirus.GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase).Select(g =>
                     $"{g.Key}：{(g.Any(a => a.Enabled) ? "即時保護開啟" : "即時保護關閉")}、{(g.Any(a => a.UpToDate) ? "病毒碼最新" : "病毒碼不是最新")}"))),
+            ("檔案備份", h.Backup.Read ? h.Backup.Summary : "無法讀取"),
         ]);
+
+        if (h.Windows11 is { IsWindows11: false } upgrade)
+            Table("Windows 11 升級", upgrade.Checks.Select(c => (c.Item, $"{c.Pass switch { true => "符合", false => "不符合", null => "無法判斷" }}：{c.Detail}")));
 
         html.Append("<section><h2>安全性設定</h2><table class=\"findings\">");
         foreach (var f in h.Security)

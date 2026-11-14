@@ -49,6 +49,8 @@ public sealed class NetworkDiagnosis
     public Func<CancellationToken, Task<TimeSpan?>> ReadClockOffset { get; init; } = ct => TimeCheck.QueryOffsetAsync(TimeServer, ct);
     public Func<ProxySetting> ReadProxy { get; init; } = ProxySetting.Read;
     public Func<HostsCheck> ReadHosts { get; init; } = HostsFile.Read;
+    public Func<IReadOnlyList<NetworkShare>> ReadShares { get; init; } = NetworkShares.Read;
+    public Func<NetworkShare, CancellationToken, Task<ShareReach>> ProbeShare { get; init; } = NetworkShares.ProbeAsync;
 
     /// <summary>Runs every check; each finished line is reported as soon as it is known.</summary>
     public async Task<IReadOnlyList<DiagnosisStep>> RunAsync(IProgress<DiagnosisStep>? progress = null, CancellationToken ct = default)
@@ -148,8 +150,49 @@ public sealed class NetworkDiagnosis
                 : new("電腦時間", DiagnosisResult.Fail, $"{text}，網域登入與加密網站都可能失敗", "用「系統工具」的「校正電腦時間」對時"));
         }
 
+        await AddSharesAsync(Add, ct);
         AddSettings(Add, proxy);
         return steps;
+    }
+
+    /// <summary>
+    /// Mapped drives and network printers, each tried at once: a line for each kind the PC has, none when it has none.
+    /// </summary>
+    private async Task AddSharesAsync(Action<DiagnosisStep> add, CancellationToken ct)
+    {
+        var shares = ReadShares();
+        if (shares.Count == 0) return;
+        var reach = await Task.WhenAll(shares.Select(s => ProbeShare(s, ct)));
+        var results = shares.Zip(reach).ToList();
+        foreach (var printers in new[] { false, true })
+        {
+            var group = results.Where(r => r.First.IsPrinter == printers).ToList();
+            if (group.Count == 0) continue;
+            var title = printers ? "網路印表機" : "網路磁碟機";
+            string Label(NetworkShare s) => printers ? $"「{s.Name}」" : $"{s.Name}（{s.Target}）";
+            var bad = group.Where(r => r.Second != ShareReach.Reachable).ToList();
+            var offline = printers ? group.Where(r => r.Second == ShareReach.Reachable && r.First.Offline).ToList() : [];
+            if (bad.Count > 0)
+            {
+                add(new(title, DiagnosisResult.Fail, string.Join("；", bad.Select(r => r.Second == ShareReach.HostUnreachable
+                        ? $"{Label(r.First)}連不到 {r.First.Host}"
+                        : $"{Label(r.First)}的伺服器有回應，但打不開資料夾")) + (bad.Count < group.Count ? $"；其餘 {group.Count - bad.Count} 個正常" : ""),
+                    printers
+                        ? "確認印表機有開機、網路燈號正常、IP 位址沒有變更；仍然不行時交給資訊人員"
+                        : bad.Any(r => r.Second == ShareReach.HostUnreachable)
+                            ? "確認 NAS 或檔案伺服器有開機、這台電腦連得到公司網路（在公司外面要先連 VPN）"
+                            : "通常是帳號密碼或權限的問題：在檔案總管重新連線並輸入帳號密碼，或交給資訊人員"));
+            }
+            else if (offline.Count > 0)
+            {
+                add(new(title, DiagnosisResult.Warning, $"{string.Join("、", offline.Select(r => Label(r.First)))}連得到，但 Windows 設定成「離線使用印表機」",
+                    "到「設定 → 藍牙與裝置 → 印表機與掃描器」開啟這台印表機的列印佇列，取消「離線使用印表機」"));
+            }
+            else
+            {
+                add(new(title, DiagnosisResult.Pass, $"{group.Count} 個都連得到：{string.Join("、", group.Take(3).Select(r => Label(r.First)))}{(group.Count > 3 ? "…" : "")}"));
+            }
+        }
     }
 
     private static readonly string[] Checks = ["IP 位址", "預設閘道", "DNS", "連上網際網路", "電腦時間"];

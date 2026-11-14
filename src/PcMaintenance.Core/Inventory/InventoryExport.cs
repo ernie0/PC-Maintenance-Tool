@@ -16,6 +16,7 @@ public static class InventoryExport
     public const string SystemKind = "電腦配備";
     public const string ConnectionsKind = "網路連線";
     public const string DevicesKind = "區域網路裝置";
+    public const string ExtensionsKind = "瀏覽器擴充功能";
 
     public static string DefaultFileName(string kind, string computerName, DateTime now, string extension = ".csv") =>
         $"{kind}-{computerName}-{now:yyyyMMdd}{extension}";
@@ -43,7 +44,15 @@ public static class InventoryExport
         return rows.Count;
     }
 
-    public static int WriteStartup(string path, IEnumerable<StartupItem> items, string computerName)
+    public static int WriteExtensions(string path, IEnumerable<BrowserExtension> extensions, string computerName)
+    {
+        var rows = extensions.Select(e => new[] { computerName, e.Browser, e.Profile, e.Name, e.Version, e.StateText, e.Source, e.Id }).ToList();
+        CsvFile.Write(path, ["電腦名稱", "瀏覽器", "設定檔", "名稱", "版本", "狀態", "來源", "識別碼"], rows);
+        return rows.Count;
+    }
+
+    /// <param name="attention">What the page marked for a second look, when it has checked the signatures.</param>
+    public static int WriteStartup(string path, IEnumerable<StartupItem> items, string computerName, Func<StartupItem, string?>? attention = null)
     {
         var rows = items.Select(i => new[]
         {
@@ -55,8 +64,9 @@ public static class InventoryExport
             i.Command,
             i.Location,
             i.IsMicrosoft ? "是" : "否",
+            attention?.Invoke(i) ?? "",
         }).ToList();
-        CsvFile.Write(path, ["電腦名稱", "名稱", "類型", "狀態", "發行者", "命令", "位置", "Microsoft 項目"], rows);
+        CsvFile.Write(path, ["電腦名稱", "名稱", "類型", "狀態", "發行者", "命令", "位置", "Microsoft 項目", "需要注意"], rows);
         return rows.Count;
     }
 
@@ -143,13 +153,17 @@ public static class InventoryExport
                 health.Stability.HardwareErrors.Count > 0 ? $"硬體錯誤 {health.Stability.HardwareErrors.Count}" : "",
                 health.Stability.ProgramCrashes.Count > 0 ? $"程式當機 {health.Stability.ProgramCrashes.Sum(p => p.Count)}" : "",
             }),
+            os.LastBoot.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+            health.Windows11?.Summary ?? "",
+            health.Backup.Summary,
             exportedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
         ];
         CsvFile.Write(path,
         [
             "電腦名稱", "網域／工作群組", "製造商", "型號", "序號", "主機板", "BIOS", "Windows", "版本", "組建", "安裝日期",
             "處理器", "核心／邏輯處理器", "記憶體", "記憶體模組", "顯示卡", "磁碟", "磁碟空間", "網路卡", "MAC 位址", "IPv4 位址",
-            "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "安全性建議", "最近 30 天的問題", "匯出時間",
+            "上次 Windows 更新", "更新安裝失敗", "有問題的裝置", "電池健康度", "印表機", "安全性建議", "最近 30 天的問題",
+            "上次開機", "Windows 11 升級", "備份", "匯出時間",
         ], [row]);
     }
 }

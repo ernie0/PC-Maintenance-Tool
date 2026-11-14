@@ -42,12 +42,12 @@ public sealed class DiagnosisRow(DiagnosisStep step)
 public sealed partial class NetworkDiagnosisViewModel(AppServices services) : ObservableObject
 {
     public const string Explanation =
-        "只在按下「開始診斷」時檢查：會 ping 預設閘道、查詢 DNS，並連到 Microsoft 的連線測試網址與時間伺服器。";
+        "只在按下「開始診斷」時檢查：會 ping 預設閘道、查詢 DNS，連到 Microsoft 的連線測試網址與時間伺服器，並試連這台電腦的網路磁碟機與網路印表機。";
 
     public ObservableCollection<DiagnosisRow> Steps { get; } = [];
 
     [ObservableProperty]
-    private string _summaryText = "按「開始診斷」，依序檢查網路卡、IP 位址、預設閘道、DNS、能不能上網與電腦時間。";
+    private string _summaryText = "按「開始診斷」，依序檢查網路卡、IP 位址、預設閘道、DNS、能不能上網、電腦時間，以及網路磁碟機與網路印表機。";
 
     [ObservableProperty]
     private bool _hasRun;

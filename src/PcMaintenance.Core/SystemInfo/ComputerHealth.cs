@@ -40,13 +40,23 @@ public sealed record ComputerHealth(
     UpdateStatus Updates, IReadOnlyList<ProblemDevice> Devices, IReadOnlyList<BatteryHealth> Batteries, IReadOnlyList<PrinterEntry> Printers,
     IReadOnlyList<DiagnosisStep> Security, StabilityReport Stability)
 {
+    public BackupStatus Backup { get; init; } = BackupStatus.Unknown;
+
+    /// <summary>Whether the hardware allows Windows 11; null when not read.</summary>
+    public Windows11Readiness? Windows11 { get; init; }
+
     /// <summary>Reads everything; it takes a second or two, so call it on a background thread.</summary>
     /// <param name="isElevated">Disk encryption can only be read as an administrator.</param>
-    public static ComputerHealth Read(bool isElevated)
+    /// <param name="info">The hardware just read, for the Windows 11 check; that check is skipped without it.</param>
+    public static ComputerHealth Read(bool isElevated, ComputerInfo? info = null)
     {
         var batteries = BatteryReader.Read();
         return new(UpdateHistory.Read(), DeviceProblems.Read(), batteries, PrinterList.Read(),
-            SecurityChecks.Read(isElevated, isLaptop: batteries.Count > 0), StabilityReader.Read());
+            SecurityChecks.Read(isElevated, isLaptop: batteries.Count > 0), StabilityReader.Read())
+        {
+            Backup = BackupStatus.ReadCurrent(new Uninstall.InstalledAppProvider().GetApps().Select(a => a.DisplayName)),
+            Windows11 = info is null ? null : Windows11Readiness.Read(info),
+        };
     }
 
     /// <summary>Security findings that call for a change.</summary>
@@ -186,6 +196,26 @@ public static partial class UpdateHistory
 
 public static class BatteryReader
 {
+    /// <summary>Whether this PC runs on a battery at all (laptops, tablets), without asking WMI.</summary>
+    public static bool HasBattery() => GetSystemPowerStatus(out var status) && status.BatteryFlag != NoSystemBattery && status.BatteryFlag != UnknownStatus;
+
+    private const byte NoSystemBattery = 128, UnknownStatus = 255;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SYSTEM_POWER_STATUS
+    {
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;
+        public int BatteryFullLifeTime;
+    }
+
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS status);
+
     public static IReadOnlyList<BatteryHealth> Read()
     {
         var names = new List<string>();

@@ -66,6 +66,13 @@ public sealed partial class StartupViewModel : PageViewModel
     [ObservableProperty]
     private bool _showMicrosoft;
 
+    /// <summary>Only entries marked for a second look: risky folder, no valid signature, or a false Microsoft claim.</summary>
+    [ObservableProperty]
+    private bool _onlyAttention;
+
+    [ObservableProperty]
+    private bool _isCheckingSignatures;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DisableCommand), nameof(EnableCommand), nameof(ApplyStartTypeCommand),
         nameof(StartServiceCommand), nameof(StopServiceCommand), nameof(RestartServiceCommand))]
@@ -106,6 +113,7 @@ public sealed partial class StartupViewModel : PageViewModel
     partial void OnSelectedFilterChanged(FilterOption value) => ApplyFilter();
     partial void OnSearchTextChanged(string value) => ApplyFilter();
     partial void OnShowMicrosoftChanged(bool value) => ApplyFilter();
+    partial void OnOnlyAttentionChanged(bool value) => ApplyFilter();
 
     partial void OnSelectedItemChanged(StartupRow? value) =>
         SelectedStartType = value?.Item.StartType is { } type ? StartTypes.FirstOrDefault(o => o.Type == type) : null;
@@ -127,6 +135,36 @@ public sealed partial class StartupViewModel : PageViewModel
         finally
         {
             IsBusy = false;
+        }
+        await CheckSignaturesAsync(_all);
+    }
+
+    /// <summary>
+    /// Verifies each program's digital signature after the list is shown (a few seconds for a few hundred files) and
+    /// marks what deserves a second look. Nothing is disabled automatically.
+    /// </summary>
+    private async Task CheckSignaturesAsync(List<StartupRow> rows)
+    {
+        IsCheckingSignatures = true;
+        ApplyFilter();
+        try
+        {
+            var notes = await Task.Run(() =>
+            {
+                var risky = StartupRisk.RiskyFolders();
+                return rows.Select(r => r.Item.ExecutablePath is { Length: > 0 } path
+                    ? StartupRisk.Describe(r.Item, FileSignatures.Check(path), risky)
+                    : null).ToList();
+            });
+            if (!ReferenceEquals(rows, _all)) return;
+            for (var i = 0; i < rows.Count; i++) rows[i].Attention = notes[i];
+            var marked = rows.Where(r => r.NeedsAttention).ToList();
+            if (marked.Count > 0) _services.Log.Info($"開機與背景：{marked.Count} 項需要注意（{string.Join("、", marked.Take(10).Select(r => $"{r.Name}：{r.Attention}"))}）");
+        }
+        finally
+        {
+            IsCheckingSignatures = false;
+            ApplyFilter();
         }
     }
 
@@ -155,7 +193,8 @@ public sealed partial class StartupViewModel : PageViewModel
         if (Dialogs.AskCsvPath(InventoryExport.StartupKind) is not { } path) return;
         try
         {
-            var count = InventoryExport.WriteStartup(path, _all.Select(r => r.Item), Environment.MachineName);
+            var attention = _all.ToDictionary(r => r.Item.Key, r => r.Attention);
+            var count = InventoryExport.WriteStartup(path, _all.Select(r => r.Item), Environment.MachineName, item => attention.GetValueOrDefault(item.Key));
             StatusText = $"已匯出 {count} 項到 {path}";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -257,20 +296,32 @@ public sealed partial class StartupViewModel : PageViewModel
     private void ApplyFilter()
     {
         var selectedKey = SelectedItem?.Item.Key;
-        var query = _all.Where(r => ShowMicrosoft || !r.Item.IsMicrosoft);
+        // An entry that calls itself Microsoft without Microsoft's signature is always shown.
+        var query = _all.Where(r => ShowMicrosoft || !r.Item.IsMicrosoft || r.NeedsAttention);
+        if (OnlyAttention) query = query.Where(r => r.NeedsAttention);
         if (SelectedFilter.Sources is { } sources) query = query.Where(r => sources.Contains(r.Item.Source));
         if (!string.IsNullOrWhiteSpace(SearchText)) query = query.Where(r => r.Matches(SearchText.Trim()));
         Items.Clear();
         foreach (var row in query) Items.Add(row);
         SelectedItem = Items.FirstOrDefault(r => r.Item.Key == selectedKey);
-        var hidden = ShowMicrosoft ? 0 : _all.Count(r => r.Item.IsMicrosoft);
-        CountText = $"顯示 {Items.Count} 項，共 {_all.Count} 項" + (hidden > 0 ? $"（已隱藏 {hidden} 項 Microsoft 項目）" : "");
+        var hidden = ShowMicrosoft ? 0 : _all.Count(r => r.Item.IsMicrosoft && !r.NeedsAttention);
+        var attention = _all.Count(r => r.NeedsAttention);
+        CountText = $"顯示 {Items.Count} 項，共 {_all.Count} 項" + (hidden > 0 ? $"（已隱藏 {hidden} 項 Microsoft 項目）" : "") +
+                    (IsCheckingSignatures ? "；正在檢查數位簽章…" : attention > 0 ? $"；{attention} 項需要注意" : _loaded ? "；數位簽章都正常" : "");
     }
 }
 
-public sealed class StartupRow(StartupItem item)
+public sealed partial class StartupRow(StartupItem item) : ObservableObject
 {
     public StartupItem Item { get; } = item;
+
+    /// <summary>Why this entry deserves a second look (see <see cref="StartupRisk"/>); null when nothing stands out.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsAttention), nameof(AttentionText))]
+    private string? _attention;
+
+    public bool NeedsAttention => Attention is not null;
+    public string AttentionText => Attention ?? "";
     public string Name => Item.Name;
     public bool IsOn => Item.Enabled;
     public string StateText => StartupText.StateName(Item);

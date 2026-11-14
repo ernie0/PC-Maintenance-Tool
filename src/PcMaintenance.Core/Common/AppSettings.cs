@@ -24,6 +24,8 @@ public sealed record AppSettings
     public bool AllowSoftwareUpdates { get; init; } = true;
     /// <summary>Where PCs leave their --export-system files; the multi-computer page opens it until a user picks another.</summary>
     public string InventoryFolder { get; init; } = "";
+    /// <summary>Minimum days between two "--auto-export" runs for the same user; 0 exports at every logon.</summary>
+    public int InventoryIntervalDays { get; init; } = 1;
 
     public static AppSettings Default { get; } = new();
 
@@ -66,6 +68,7 @@ public static class SettingsLoader
         MinFileAgeHours = Math.Clamp(s.MinFileAgeHours, 0, 24 * 365),
         DuplicateMinSizeMB = Math.Clamp(s.DuplicateMinSizeMB, 0, 1024 * 1024),
         AutoCleanIntervalDays = Math.Clamp(s.AutoCleanIntervalDays, 0, 365),
+        InventoryIntervalDays = Math.Clamp(s.InventoryIntervalDays, 0, 365),
         // JSON null overrides the initializer, so restore empty lists.
         DisabledJunkCategories = s.DisabledJunkCategories ?? [],
         ExcludedPaths = s.ExcludedPaths ?? [],

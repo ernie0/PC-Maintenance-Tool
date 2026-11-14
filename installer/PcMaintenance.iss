@@ -53,11 +53,15 @@ Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional
 [Tasks]
 Name: "desktopicon"; Description: "建立桌面捷徑"; GroupDescription: "捷徑："; Flags: unchecked
 Name: "autoclean"; Description: "每位使用者登入時自動清理暫存檔與快取（間隔天數依公司設定，預設 7 天）"; GroupDescription: "自動維護："; Flags: unchecked
+Name: "autoexport"; Description: "每位使用者登入時把電腦配備、軟體清單與瀏覽器擴充功能存到公司的電腦盤點資料夾（需要公司設定檔的 inventoryFolder）"; GroupDescription: "自動維護："; Flags: unchecked
 
 [Registry]
 ; 自動清理：登入時以使用者本身的權限在背景執行，未到間隔天數就直接結束；取消勾選重裝或解除安裝時移除。
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "PcMaintenanceAutoClean"; ValueData: """{app}\PcMaintenance.exe"" --auto-clean"; Flags: uninsdeletevalue; Tasks: autoclean
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "PcMaintenanceAutoClean"; Flags: deletevalue; Tasks: not autoclean
+; 定期匯出：同樣在登入時以使用者本身的權限在背景執行；公司設定檔沒有 inventoryFolder 或未到間隔天數就直接結束。
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "PcMaintenanceAutoExport"; ValueData: """{app}\PcMaintenance.exe"" --auto-export"; Flags: uninsdeletevalue; Tasks: autoexport
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "PcMaintenanceAutoExport"; Flags: deletevalue; Tasks: not autoexport
 
 #ifdef FrameworkDependent
 [InstallDelete]

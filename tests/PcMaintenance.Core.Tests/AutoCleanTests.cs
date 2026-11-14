@@ -1,4 +1,5 @@
 using PcMaintenance.Core.Common;
+using PcMaintenance.Core.Inventory;
 using PcMaintenance.Core.Junk;
 
 namespace PcMaintenance.Core.Tests;
@@ -88,5 +89,33 @@ public class AutoCleanTests
         Assert.False(File.Exists(dump));
         Assert.True(File.Exists(sibling));
         Assert.True(Directory.Exists(emptyFolder));
+    }
+    [Theory]
+    [InlineData(null, 1, true)]
+    [InlineData("2026-11-14 08:00", 1, false)]
+    [InlineData("2026-11-13 23:50", 1, true)]
+    [InlineData("2026-11-10 08:00", 7, false)]
+    [InlineData("2026-11-14 08:00", 0, true)]
+    public void The_logon_export_runs_once_per_calendar_day_interval(string? last, int interval, bool due)
+    {
+        var now = new DateTimeOffset(new DateTime(2026, 11, 14, 9, 0, 0, DateTimeKind.Local));
+        var state = last is null ? null : new AutoExportState(new DateTimeOffset(DateTime.Parse(last)), @"\server\share");
+        Assert.Equal(due, AutoExport.IsDue(state, now, interval, @"\server\share"));
+        // A new folder in the company settings exports at once.
+        Assert.True(AutoExport.IsDue(state ?? new AutoExportState(now, "x"), now, interval, @"\server\other"));
+    }
+
+    [Fact]
+    public void The_logon_export_waits_for_the_folder_and_parses()
+    {
+        using var temp = new TempDir();
+        var waits = new List<TimeSpan>();
+        Assert.True(AutoExport.WaitForFolder(temp.Path, TimeSpan.FromMinutes(2), waits.Add));
+        Assert.Empty(waits);
+        Assert.False(AutoExport.WaitForFolder(Path.Combine(temp.Path, "x"), TimeSpan.FromSeconds(30), waits.Add));
+        Assert.Equal(3, waits.Count);
+        Assert.Equal(new CliCommand(CliAction.AutoExport), CliCommand.Parse(["--auto-export"]));
+        Assert.Equal(new CliCommand(CliAction.ExportExtensions, Path: @"C:\x\"), CliCommand.Parse(["--export-extensions", @"C:\x\"]));
+        Assert.Equal(1, AppSettings.Default.InventoryIntervalDays);
     }
 }

@@ -196,6 +196,13 @@ public sealed partial class MaintenanceViewModel : PageViewModel
                 ActionText = "開啟 Windows Update",
                 Action = () => SystemActions.Open("ms-settings:windowsupdate"),
             },
+            new("Windows 版本", "Windows 10 已結束支援；是 Windows 10 時檢查能不能升級到 Windows 11（TPM、處理器等）",
+                "\uE7F8", Color.FromRgb(0x03, 0x69, 0xA1))
+            {
+                Scan = ScanWindowsVersionAsync,
+                ActionText = "前往電腦資訊",
+                Action = () => NavigateRequested?.Invoke(typeof(SystemInfoViewModel)),
+            },
             new("裝置狀態", "裝置管理員中標示有問題的裝置，例如沒有驅動程式或無法啟動",
                 "\uE772", Color.FromRgb(0x4F, 0x46, 0xE5))
             {
@@ -216,6 +223,13 @@ public sealed partial class MaintenanceViewModel : PageViewModel
                 Scan = ScanSecuritySettingsAsync,
                 ActionText = "前往電腦資訊",
                 Action = () => NavigateRequested?.Invoke(typeof(SystemInfoViewModel)),
+            },
+            new("檔案備份", "桌面與文件有沒有備份：OneDrive 資料夾備份、檔案歷程記錄或備份軟體（只檢查有沒有設定）",
+                "\uE8F7", Color.FromRgb(0x0D, 0x94, 0x88))
+            {
+                Scan = ScanBackupAsync,
+                ActionText = "開啟 Windows 備份",
+                Action = () => SystemActions.Open("ms-settings:backup"),
             },
             new("重新開機", "Windows 更新是否在等待重新開機，以及電腦連續開機的天數",
                 "", Color.FromRgb(0x47, 0x55, 0x69))
@@ -241,7 +255,7 @@ public sealed partial class MaintenanceViewModel : PageViewModel
     public override string Title => "一鍵維護";
 
     public override string Subtitle =>
-        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒、Windows 更新、裝置、穩定度與安全性設定，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
+        "一次檢查暫存檔、無效捷徑、開機程式、磁碟、防毒、Windows 更新與版本、裝置、穩定度、安全性設定與備份，確認清單後再一鍵處理。只會處理可以還原或 Windows 會自動重建的項目，其餘只提供建議。";
 
     public ObservableCollection<MaintenanceCheck> Checks { get; }
 
@@ -735,6 +749,32 @@ public sealed partial class MaintenanceViewModel : PageViewModel
         return days >= HealthText.StaleUpdateDays
             ? new CheckOutcome(CheckState.Advice, $"已經 {days} 天沒有安裝 Windows 更新", "Windows 每個月都有安全性更新，請到 Windows Update 檢查更新")
             : new CheckOutcome(CheckState.Good, days == 0 ? "今天安裝過 Windows 更新" : $"{days} 天前安裝過 Windows 更新");
+    }, ct);
+
+    private Task<CheckOutcome> ScanWindowsVersionAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("讀取 Windows 版本與 Windows 11 的硬體需求");
+        var info = SystemInfoReader.Read();
+        var readiness = Windows11Readiness.Read(info);
+        if (readiness.IsWindows11) return new CheckOutcome(CheckState.Good, $"{info.Os.Name} {info.Os.DisplayVersion}".Trim());
+        var missing = readiness.Checks.Where(c => c.Pass != true).Select(c => $"{c.Item}：{c.Detail}").ToList();
+        return new CheckOutcome(CheckState.Advice, readiness.State switch
+            {
+                Windows11State.CanUpgrade => "Windows 10 已結束支援，這台電腦可以升級到 Windows 11",
+                Windows11State.CannotUpgrade => "Windows 10 已結束支援，硬體不能升級到 Windows 11",
+                _ => "Windows 10 已結束支援，請確認能否升級到 Windows 11",
+            },
+            missing.Count > 0 ? string.Join("；", missing) : "硬體條件都符合；可到 Windows Update 檢查是否已提供 Windows 11，升級前請先備份資料");
+    }, ct);
+
+    private Task<CheckOutcome> ScanBackupAsync(CancellationToken ct) => Task.Run(() =>
+    {
+        Report("檢查 OneDrive 資料夾備份、檔案歷程記錄與備份軟體");
+        var status = BackupStatus.ReadCurrent(new InstalledAppProvider().GetApps().Select(a => a.DisplayName));
+        return status.AnyFound
+            ? new CheckOutcome(CheckState.Good, status.Summary, "只能確認有設定備份，無法確認最近一次備份是否成功")
+            : new CheckOutcome(CheckState.Advice, "沒有偵測到檔案備份",
+                "電腦故障或中勒索病毒時，桌面與文件裡的檔案可能救不回來；可以開啟 OneDrive 的資料夾備份，或請資訊人員設定備份");
     }, ct);
 
     private Task<CheckOutcome> ScanDevicesAsync(CancellationToken ct) => Task.Run(() =>

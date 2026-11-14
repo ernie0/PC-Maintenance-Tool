@@ -28,6 +28,8 @@ public sealed record InfoSection(string Title, IReadOnlyList<LabeledValue> Rows)
         "穩定度（最近 30 天）" => "\uE9D9",
         "電池" => "\uE83F",
         "印表機" => "\uE749",
+        "Windows 11 升級" => "\uE777",
+        "檔案備份" => "\uE8F7",
         _ => "",
     };
 }
@@ -46,7 +48,7 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
     public ObservableCollection<InfoSection> RightSections { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(CopyCommand), nameof(ExportCommand), nameof(ExportReportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(CopyCommand), nameof(CopyHelpCommand), nameof(ExportCommand), nameof(ExportReportCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -64,7 +66,11 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
         StatusText = "正在讀取電腦資訊…";
         try
         {
-            (_info, _health) = await Task.Run(() => (SystemInfoReader.Read(), ComputerHealth.Read(services.IsElevated)));
+            (_info, _health) = await Task.Run(() =>
+            {
+                var info = SystemInfoReader.Read();
+                return (info, ComputerHealth.Read(services.IsElevated, info));
+            });
             _sections = Sections(_info, _health, services.IsElevated, DateTime.Now);
             // Each section goes to the shorter column so the two columns end up about the same height.
             LeftSections.Clear();
@@ -105,10 +111,46 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
             foreach (var row in section.Rows) text.AppendLine($"{row.Label}：{row.Value}");
             text.AppendLine();
         }
+        CopyText(text.ToString().TrimEnd(), "已複製，可以貼到訊息或文件中。");
+    }
+
+    /// <summary>The few lines a help desk asks for first, ready to paste into a message or read out on the phone.</summary>
+    [RelayCommand(CanExecute = nameof(HasInfo))]
+    private void CopyHelp()
+    {
+        if (_info is null) return;
+        var adapter = Core.Network.NetworkDiagnosis.ReadActiveAdapter();
+        CopyText(HelpText(_info, adapter, $"{Environment.UserDomainName}\\{Environment.UserName}", DateTime.Now, MainViewModel.AppVersion),
+            "已複製求助資訊（電腦名稱、使用者、IP 位址、型號與序號、Windows 版本、開機時間與剩餘空間），可以貼給資訊人員。");
+    }
+
+    internal static string HelpText(ComputerInfo info, Core.Network.ActiveAdapter? adapter, string user, DateTime now, string appVersion)
+    {
+        var uptime = now - info.Os.LastBoot;
+        var system = info.Disks.Volumes.FirstOrDefault(v => v.IsSystem) ?? info.Disks.Volumes.FirstOrDefault();
+        var ip = adapter?.IPv4 is { } address
+            ? $"{address}（{(adapter.IsWireless ? "Wi-Fi" : "有線網路")}）"
+            : info.Network.SelectMany(n => n.IPv4).FirstOrDefault() ?? "沒有網路連線";
+        var model = $"{info.Machine.Manufacturer} {info.Machine.Model}".Trim();
+        return string.Join(Environment.NewLine, new[]
+        {
+            $"電腦名稱：{info.Machine.ComputerName}",
+            $"使用者：{user}",
+            $"IP 位址：{ip}",
+            $"型號：{(model.Length > 0 ? model : "—")}" + (info.Machine.SerialNumber.Length > 0 ? $"（序號 {info.Machine.SerialNumber}）" : ""),
+            $"Windows：{info.Os.Name} {info.Os.DisplayVersion}（組建 {info.Os.Build}）".Replace("  ", " "),
+            $"已開機：{(int)uptime.TotalDays} 天 {uptime.Hours} 小時（上次開機 {info.Os.LastBoot:yyyy/MM/dd HH:mm}）",
+            system is null ? "" : $"{system.Letter}: 剩 {ByteSize.Format(system.FreeBytes)}／{ByteSize.Format(system.TotalBytes)}（{system.FreePercent:0}%）",
+            $"電腦維護工具 {appVersion}",
+        }.Where(line => line.Length > 0));
+    }
+
+    private void CopyText(string text, string done)
+    {
         try
         {
-            Clipboard.SetText(text.ToString().TrimEnd());
-            StatusText = "已複製，可以貼到訊息或文件中。";
+            Clipboard.SetText(text);
+            StatusText = done;
         }
         catch (COMException)
         {
@@ -251,8 +293,31 @@ public sealed partial class SystemInfoViewModel(AppServices services) : PageView
             .. disabled.Select(d => new LabeledValue("已停用", d.Name)),
         ]));
 
+        if (health.Windows11 is { IsWindows11: false } upgrade)
+        {
+            sections.Add(new("Windows 11 升級",
+            [
+                new LabeledValue("結論", upgrade.Concern ?? upgrade.Summary),
+                .. upgrade.Checks.Select(c => new LabeledValue(c.Item, $"{c.Pass switch { true => "✔", false => "✘", null => "？" }} {c.Detail}")),
+            ]));
+        }
+
         sections.Add(new("安全性", HealthText.Security(health.Security)));
         sections.Add(new("穩定度（最近 30 天）", HealthText.Stability(health.Stability)));
+
+        if (health.Backup.Read)
+        {
+            var backup = health.Backup;
+            sections.Add(new("檔案備份", !backup.AnyFound
+                ? [new LabeledValue("狀態", "沒有偵測到 OneDrive 資料夾備份、檔案歷程記錄或備份軟體。電腦故障或中勒索病毒時，桌面與文件裡的檔案可能救不回來，請和資訊人員確認備份方式。")]
+                :
+                [
+                    .. backup.OneDriveFolders.Count > 0 ? [new LabeledValue("OneDrive", $"{string.Join("、", backup.OneDriveFolders)}在 OneDrive 資料夾中，會自動備份到雲端")] : Array.Empty<LabeledValue>(),
+                    .. backup.FileHistory ? [new LabeledValue("檔案歷程記錄", "已設定")] : Array.Empty<LabeledValue>(),
+                    .. backup.BackupSoftware.Count > 0 ? [new LabeledValue("備份軟體", string.Join("、", backup.BackupSoftware))] : Array.Empty<LabeledValue>(),
+                    new LabeledValue("說明", "只能確認有設定備份，無法確認最近一次備份是否成功"),
+                ]));
+        }
 
         foreach (var battery in health.Batteries)
             sections.Add(new("電池", HealthText.Battery(battery, isElevated)));

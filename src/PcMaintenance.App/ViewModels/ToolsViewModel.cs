@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using PcMaintenance.App.Services;
 using PcMaintenance.Core.Common;
 using PcMaintenance.Core.Maintenance;
+using PcMaintenance.Core.SystemInfo;
 
 namespace PcMaintenance.App.ViewModels;
 
@@ -113,6 +114,12 @@ public sealed class ToolsViewModel : PageViewModel
             },
             new("校正電腦時間", "電腦時間差幾分鐘以上會讓網域登入失敗、網站出現憑證錯誤：立即和時間伺服器對時。",
                 "\uE823", SyncTime) { NeedsAdmin = true },
+            .. BatteryReader.HasBattery()
+                ? [new ToolItem("電池使用報告", "筆電電池越來越不耐用時使用：產生 Windows 的電池報告（容量變化、最近的使用與充電紀錄、預估續航力），用瀏覽器開啟。",
+                    "\uE83F", BatteryReportAsync)]
+                : Array.Empty<ToolItem>(),
+            new("電腦不睡眠或自己醒來", "列出目前不讓電腦睡眠或關閉螢幕的程式、上次喚醒電腦的原因，以及會喚醒電腦的排程與裝置。",
+                "\uE708", SleepDiagnosis) { NeedsAdmin = true },
         ];
         Backups =
         [
@@ -258,6 +265,39 @@ public sealed class ToolsViewModel : PageViewModel
             "echo.", "w32tm /query /status",
             "echo.", "echo 完成，可以關閉這個視窗。");
         return RunInConsole("校正電腦時間", commands);
+    }
+
+    /// <summary>powercfg's own battery report, which any user may create; it goes to Documents\電源報告 and opens in the browser.</summary>
+    private async Task<string?> BatteryReportAsync()
+    {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "電源報告");
+        Directory.CreateDirectory(folder);
+        var file = Path.Combine(folder, $"電池報告-{Environment.MachineName}-{DateTime.Now:yyyyMMdd-HHmm}.html");
+        var (exitCode, output) = await ConsoleTool.RunAsync(Path.Combine(Environment.SystemDirectory, "powercfg.exe"), $"/batteryreport /output \"{file}\"");
+        if (exitCode != 0 || !File.Exists(file))
+        {
+            _services.Log.Warn($"電池報告失敗（{exitCode}）：{output.Trim()}");
+            return "無法產生電池報告，原因寫在記錄檔。";
+        }
+        _services.Log.Info($"電池報告：{file}");
+        Shell.OpenFile(file);
+        return $"已產生電池報告並用瀏覽器開啟：{file}";
+    }
+
+    /// <summary>What keeps the PC awake or wakes it, from powercfg; these queries need an elevated console.</summary>
+    private static Task<string?> SleepDiagnosis()
+    {
+        var commands = string.Join("&",
+            "echo 【目前不讓電腦睡眠或關閉螢幕的程式】DISPLAY＝不讓螢幕關閉，SYSTEM＝不讓電腦睡眠，「無」表示沒有：",
+            "powercfg /requests",
+            "echo 【上次喚醒電腦的原因】",
+            "powercfg /lastwake",
+            "echo.", "echo 【會喚醒電腦的排程】",
+            "powercfg /waketimers",
+            "echo.", "echo 【可以喚醒電腦的裝置】不希望它喚醒電腦時，到裝置管理員打開該裝置的「電源管理」取消勾選「允許此裝置喚醒電腦」：",
+            "powercfg /devicequery wake_armed",
+            "echo.", "echo 完成，可以關閉這個視窗。");
+        return RunInConsole("電腦不睡眠或自己醒來", commands);
     }
 
     private async Task<string?> RebuildIconCacheAsync()

@@ -41,6 +41,8 @@
         <DockPanel Margin="0,0,0,10" LastChildFill="False">
             <Button DockPanel.Dock="Left" Content="複製全部" Command="{Binding CopyCommand}" Style="{StaticResource PrimaryButton}"
                     local:Glyph.Text="&#xE8C8;" />
+            <Button DockPanel.Dock="Left" Content="複製求助資訊" Command="{Binding CopyHelpCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    local:Glyph.Text="&#xE897;" ToolTip="電腦名稱、使用者、IP 位址、型號與序號、Windows 版本、已開機多久與剩餘空間，可以貼給資訊人員" />
             <Button DockPanel.Dock="Left" Content="匯出 CSV" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     local:Glyph.Text="&#xEDE1;" local:Glyph.Motion="Nudge" ToolTip="一台電腦一列，方便把各台電腦的檔案合併成一張表" />
             <Button DockPanel.Dock="Left" Content="匯出健檢報告" Command="{Binding ExportReportCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"

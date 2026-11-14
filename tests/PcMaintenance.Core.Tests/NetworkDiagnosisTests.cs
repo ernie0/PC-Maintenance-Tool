@@ -11,7 +11,8 @@ public class NetworkDiagnosisTests
 
     private static NetworkDiagnosis Diagnosis(
         ActiveAdapter? adapter = null, long? ping = 2, bool resolves = true, TestPageReply? page = null, TimeSpan? clock = null,
-        ProxySetting? proxy = null, HostsCheck? hosts = null, bool noAdapter = false) => new()
+        ProxySetting? proxy = null, HostsCheck? hosts = null, bool noAdapter = false,
+        IReadOnlyList<NetworkShare>? shares = null, Func<NetworkShare, ShareReach>? reach = null) => new()
         {
             ReadAdapter = () => noAdapter ? null : adapter ?? Wired,
             ReadWifiSignal = _ => 30,
@@ -21,7 +22,30 @@ public class NetworkDiagnosisTests
             ReadClockOffset = _ => Task.FromResult(clock),
             ReadProxy = () => proxy ?? new ProxySetting(ProxyKind.None, ""),
             ReadHosts = () => hosts ?? new HostsCheck(true, [], []),
+            ReadShares = () => shares ?? [],
+            ProbeShare = (s, _) => Task.FromResult(reach?.Invoke(s) ?? ShareReach.Reachable),
         };
+
+    [Fact]
+    public async Task Mapped_drives_and_network_printers_are_tried()
+    {
+        NetworkShare[] shares =
+        [
+            new(false, "Z:", @"\\nas\共用", "nas", 445, @"\\nas\共用"),
+            new(false, "Y:", @"\\old-server\資料", "old-server", 445, @"\\old-server\資料"),
+            new(true, "事務機", "192.168.1.30:9100", "192.168.1.30", 9100, null, Offline: true),
+        ];
+        var steps = await Diagnosis(page: Online, clock: TimeSpan.Zero, shares: shares,
+            reach: s => s.Host == "old-server" ? ShareReach.HostUnreachable : ShareReach.Reachable).RunAsync();
+        Assert.Equal(["網路卡", "IP 位址", "預設閘道", "DNS", "連上網際網路", "電腦時間", "網路磁碟機", "網路印表機", "Proxy", "hosts 檔"], steps.Select(s => s.Title));
+        var drives = Step(steps, "網路磁碟機");
+        Assert.Equal(DiagnosisResult.Fail, drives.Result);
+        Assert.Equal(@"Y:（\\old-server\資料）連不到 old-server；其餘 1 個正常", drives.Detail);
+        Assert.Contains("VPN", drives.NextStep);
+        Assert.Equal(DiagnosisResult.Warning, Step(steps, "網路印表機").Result);
+        Assert.Equal("nas", NetworkShares.HostOf(@"\\nas\共用\a"));
+        Assert.Null(NetworkShares.HostOf(@"C:\x"));
+    }
 
     private static readonly TestPageReply Online = new(200, NetworkDiagnosis.TestContent);
 

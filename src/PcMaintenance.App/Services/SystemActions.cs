@@ -26,6 +26,23 @@ public static class SystemActions
         }
     }
 
+    /// <summary>Where an installed program such as chrome.exe lives, from the "App Paths" registration installers make.</summary>
+    public static string? AppPath(string exe)
+    {
+        foreach (var hive in new[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine })
+        {
+            try
+            {
+                using var key = hive.OpenSubKey($@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe}");
+                if (key?.GetValue(null) is string path && File.Exists(path.Trim('"'))) return path.Trim('"');
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+            {
+            }
+        }
+        return null;
+    }
+
     /// <summary>Runs commands in a console of this user that stays open; programs in it ask for elevation themselves.</summary>
     public static bool RunInConsole(string title, string commands) =>
         Open(Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/k title {title}&{commands}");
