@@ -105,7 +105,10 @@ public sealed partial class JunkViewModel : PageViewModel
         {
             foreach (var row in targets)
             {
-                ProgressText = $"正在清理：{row.Name}";
+                // Disk Cleanup took from twenty seconds to over ten minutes for the same small folder in testing.
+                ProgressText = row.Category.DiskCleanupHandler is null
+                    ? $"正在清理：{row.Name}"
+                    : $"正在清理：{row.Name}（交給 Windows 磁碟清理，可能需要十幾分鐘，請不要關閉程式）";
                 var result = await Task.Run(() => cleaner.Clean(row.Result!, cts.Token), cts.Token);
                 row.ShowCleaned(result);
                 freed += result.FreedBytes;
