@@ -100,9 +100,12 @@ public class TaskManagerTests
         using var sampler = new PerformanceSampler(baseMHz: null);
         Thread.Sleep(300);
         var sampled = sampler.Sample(Stopwatch.GetTimestamp()).Gpus;
-        // A virtual machine without a GPU (the GitHub runner) lists only a software adapter and has no GPU Engine counters.
-        if (sampled.Count == 0) return;
-        Assert.Contains(sampled, s => gpus.Any(g => g.Luid == s.Luid));
+        Assert.All(sampled, s => Assert.Matches("^0x[0-9A-F]{8}_0x[0-9A-F]{8}$", s.Luid));
+        // A virtual machine without a graphics card (the GitHub runner) has counters only for Windows' software renderer,
+        // which DirectX's list leaves out, and lists Microsoft's virtual display adapters, which have no counters.
+        var physical = gpus.Where(g => !g.Name.StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (physical.Count == 0 || sampled.Count == 0) return;
+        Assert.Contains(sampled, s => physical.Any(g => g.Luid == s.Luid));
     }
 
     [Fact]
