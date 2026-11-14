@@ -35,6 +35,7 @@ public sealed partial class NetworkViewModel : ObservableObject
     public static readonly NetworkSection ConnectionsSection = new("連線");
     public static readonly NetworkSection TrafficSection = new("程式流量");
     public static readonly NetworkSection DevicesSection = new("區域網路裝置");
+    public static readonly NetworkSection DiagnosisSection = new("網路診斷");
 
     private readonly AppServices _services;
     private readonly ProcessNames _names;
@@ -66,6 +67,11 @@ public sealed partial class NetworkViewModel : ObservableObject
         DeviceView = new ListCollectionView(Devices) { Filter = item => item is DeviceRow row && row.Matches(SearchText.Trim()) };
         DeviceView.SortDescriptions.Add(new SortDescription(nameof(DeviceRow.SortKey), ListSortDirection.Ascending));
         Traffic = new ProgramTrafficViewModel(services);
+        Diagnosis = new NetworkDiagnosisViewModel(services);
+        Diagnosis.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(NetworkDiagnosisViewModel.SummaryText) && IsDiagnosis) UpdateTexts();
+        };
         Traffic.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ProgramTrafficViewModel.SelectedProgram)) OpenLocationCommand.NotifyCanExecuteChanged();
@@ -73,8 +79,9 @@ public sealed partial class NetworkViewModel : ObservableObject
         _timer.Tick += async (_, _) => await RefreshAsync();
     }
 
-    public IReadOnlyList<NetworkSection> Sections { get; } = [ConnectionsSection, TrafficSection, DevicesSection];
+    public IReadOnlyList<NetworkSection> Sections { get; } = [ConnectionsSection, TrafficSection, DevicesSection, DiagnosisSection];
     public ProgramTrafficViewModel Traffic { get; }
+    public NetworkDiagnosisViewModel Diagnosis { get; }
     public ObservableCollection<NetworkFilter> Filters { get; }
     public ObservableCollection<ConnectionRow> Connections { get; } = [];
     public ListCollectionView ConnectionView { get; }
@@ -82,7 +89,8 @@ public sealed partial class NetworkViewModel : ObservableObject
     public ListCollectionView DeviceView { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDevices), nameof(IsConnections), nameof(IsTraffic), nameof(HasAddresses), nameof(CanShowLocation), nameof(SearchHint))]
+    [NotifyPropertyChangedFor(nameof(IsDevices), nameof(IsConnections), nameof(IsTraffic), nameof(IsDiagnosis), nameof(HasAddresses),
+        nameof(CanShowLocation), nameof(HasSearch), nameof(SearchHint))]
     [NotifyCanExecuteChangedFor(nameof(OpenLocationCommand))]
     private NetworkSection _selectedSection = ConnectionsSection;
 
@@ -116,9 +124,11 @@ public sealed partial class NetworkViewModel : ObservableObject
     public bool IsDevices => SelectedSection == DevicesSection;
     public bool IsTraffic => SelectedSection == TrafficSection;
     public bool IsConnections => SelectedSection == ConnectionsSection;
-    /// <summary>Host names and the export apply to lists of addresses, not to the traffic view.</summary>
-    public bool HasAddresses => !IsTraffic;
-    public bool CanShowLocation => !IsDevices;
+    public bool IsDiagnosis => SelectedSection == DiagnosisSection;
+    /// <summary>Host names and the export apply to lists of addresses: connections and devices.</summary>
+    public bool HasAddresses => IsConnections || IsDevices;
+    public bool CanShowLocation => IsConnections || IsTraffic;
+    public bool HasSearch => !IsDiagnosis;
     public string SearchHint => IsDevices ? "搜尋 IP、實體位址或名稱" : IsTraffic ? "搜尋程式" : "搜尋程式、位址、服務或名稱";
 
     public string DetailText => SelectedConnection is not { } row ? "" :
@@ -237,7 +247,7 @@ public sealed partial class NetworkViewModel : ObservableObject
 
     private async Task RefreshAsync()
     {
-        if (_sampling || !_active) return;
+        if (_sampling || !_active || IsDiagnosis) return;
         _sampling = true;
         try
         {
@@ -343,6 +353,12 @@ public sealed partial class NetworkViewModel : ObservableObject
 
     private void UpdateTexts()
     {
+        if (IsDiagnosis)
+        {
+            CountText = Diagnosis.SummaryText;
+            NoteText = NetworkDiagnosisViewModel.Explanation;
+            return;
+        }
         if (IsTraffic)
         {
             CountText = Traffic.SummaryText;

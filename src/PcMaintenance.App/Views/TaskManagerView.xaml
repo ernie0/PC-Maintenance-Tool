@@ -191,11 +191,15 @@
                             Visibility="{Binding HasAddresses, Converter={StaticResource BoolToVisibility}}" />
                     <Button DockPanel.Dock="Right" Content="開啟檔案位置" Command="{Binding OpenLocationCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                             local:Glyph.Text="&#xE838;" Visibility="{Binding CanShowLocation, Converter={StaticResource BoolToVisibility}}" />
+                    <Button DockPanel.Dock="Right" Content="開始診斷" Command="{Binding Diagnosis.RunCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE9D9;" local:Glyph.Busy="{Binding Diagnosis.RunCommand.IsRunning}"
+                            Visibility="{Binding IsDiagnosis, Converter={StaticResource BoolToVisibility}}" />
                 </DockPanel>
 
                 <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="False">
                     <TextBox DockPanel.Dock="Left" Width="230" Margin="0,0,16,0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             Tag="{Binding SearchHint}" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋網路" />
+                             Tag="{Binding SearchHint}" local:Glyph.Text="&#xE721;" AutomationProperties.Name="搜尋網路"
+                             Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}" />
                     <ListBox DockPanel.Dock="Left" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" DisplayMemberPath="Label"
                              Style="{StaticResource SegmentList}" ItemContainerStyle="{StaticResource SegmentItem}" AutomationProperties.Name="篩選連線"
                              Visibility="{Binding IsConnections, Converter={StaticResource BoolToVisibility}}" />
@@ -297,6 +301,37 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                             </DataGrid>
+                        </Grid>
+                        <!-- Network check: one line per finding, with what to do next. -->
+                        <Grid DataContext="{Binding Diagnosis}" Visibility="{Binding DataContext.IsDiagnosis, RelativeSource={RelativeSource AncestorType=ContentControl}, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="網路有問題時按右上方的「開始診斷」，會依序檢查並告訴你下一步該做什麼。" Style="{StaticResource SubtleText}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24"
+                                       Visibility="{Binding HasRun, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                                <ItemsControl ItemsSource="{Binding Steps}" Focusable="False" AutomationProperties.Name="診斷結果">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" Padding="18,11">
+                                                <DockPanel>
+                                                    <Border DockPanel.Dock="Left" Style="{StaticResource IconTile}" Width="30" Height="30" CornerRadius="15"
+                                                            Background="{Binding SoftBrush}" Margin="0,0,12,0" VerticalAlignment="Top">
+                                                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource IconText}" FontSize="14" Foreground="{Binding ToneBrush}" />
+                                                    </Border>
+                                                    <StackPanel>
+                                                        <DockPanel>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding ResultText}" Foreground="{Binding ToneBrush}" FontWeight="SemiBold" Margin="12,0,0,0" />
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                        </DockPanel>
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                        <TextBlock Text="{Binding NextStep, StringFormat=建議：{0}}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                                                   Visibility="{Binding NextStep, Converter={StaticResource TextToVisibility}}" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
                         <DataGrid ItemsSource="{Binding DeviceView}" EnableRowVirtualization="True" AutomationProperties.Name="區域網路裝置"
                                   Visibility="{Binding IsDevices, Converter={StaticResource BoolToVisibility}}">
