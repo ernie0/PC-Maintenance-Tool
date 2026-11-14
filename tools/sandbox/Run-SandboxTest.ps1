@@ -1,9 +1,11 @@
 ﻿# 在 Windows Sandbox 裡跑一個測試腳本：發佈目前的程式（自帶執行環境的單一 exe）、啟動 Sandbox、等測試寫出 DONE。
 # 本機螢幕一律不擷取；截圖由測試在 Sandbox 裡只拍程式自己的視窗（PrintWindow）。
 # 用法：pwsh -File tools\sandbox\Run-SandboxTest.ps1 -Test system-changes [-SkipPublish]
+#       安裝檔的測試另外指定放安裝檔的資料夾：-Test installer-upgrade -Installers <資料夾>（Sandbox 裡是 C:\pcm\installers，唯讀）
 param(
   [Parameter(Mandatory)][string]$Test,
   [switch]$SkipPublish,
+  [string]$Installers,
   [int]$MinutesToFinish = 20
 )
 $ErrorActionPreference = 'Stop'
@@ -14,6 +16,10 @@ $out = Join-Path $work 'out'
 $tests = Join-Path $PSScriptRoot 'tests'
 if (-not (Test-Path (Join-Path $tests "$Test.ps1"))) { throw "找不到測試 tests\$Test.ps1" }
 if ((wsb list 2>&1 | Out-String).Trim()) { throw '已有 Windows Sandbox 在執行，Windows 一次只能開一個' }
+if ($Installers -and -not (Test-Path $Installers)) { throw "找不到安裝檔資料夾 $Installers" }
+$installerFolder = if ($Installers) {
+  "    <MappedFolder><HostFolder>$((Resolve-Path $Installers).Path)</HostFolder><SandboxFolder>C:\pcm\installers</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>`n"
+} else { '' }
 
 if (-not $SkipPublish) {
   dotnet publish (Join-Path $root 'src\PcMaintenance.App') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=embedded -o $app --nologo
@@ -35,7 +41,7 @@ $config = Join-Path $work 'test.wsb'
     <MappedFolder><HostFolder>$app</HostFolder><SandboxFolder>C:\pcm\app</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
     <MappedFolder><HostFolder>$tests</HostFolder><SandboxFolder>C:\pcm\tests</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
     <MappedFolder><HostFolder>$out</HostFolder><SandboxFolder>C:\pcm\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>
-  </MappedFolders>
+$installerFolder  </MappedFolders>
   <LogonCommand>
     <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\pcm\tests\$Test.ps1</Command>
   </LogonCommand>
