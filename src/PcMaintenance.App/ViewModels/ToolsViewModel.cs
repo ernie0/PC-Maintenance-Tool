@@ -105,6 +105,14 @@ public sealed class ToolsViewModel : PageViewModel
             },
             new("重設 Microsoft Store", "商店打不開或下載卡住時使用；完成後商店會自動開啟。", "",
                 () => Open(Path.Combine(Environment.SystemDirectory, "wsreset.exe"), "已開始重設 Microsoft Store，完成後商店會自動開啟。")),
+            new("清除卡住的列印工作", "印表機一直顯示「正在列印」、後面的文件都印不出來時使用：停止列印服務、清空等待中的工作，再重新啟動。",
+                "\uE749", ClearPrintQueue)
+            {
+                NeedsAdmin = true,
+                Confirm = "會刪除這台電腦所有印表機等待中的列印工作，需要的文件要再印一次。確定要清除嗎？",
+            },
+            new("校正電腦時間", "電腦時間差幾分鐘以上會讓網域登入失敗、網站出現憑證錯誤：立即和時間伺服器對時。",
+                "\uE823", SyncTime) { NeedsAdmin = true },
         ];
         Backups =
         [
@@ -220,6 +228,36 @@ public sealed class ToolsViewModel : PageViewModel
             $" & echo 已存成 {pcap}，可以用 Wireshark 開啟。 & start \"\" explorer /select,\"{pcap}\")" +
             " || echo 無法開始擷取：可能已有其他封包擷取在進行（例如上次擷取時直接關掉了視窗），請在這個視窗輸入 pktmon stop 後再試一次。");
         return RunInConsole("擷取網路封包", commands);
+    }
+
+    /// <summary>
+    /// The spooler keeps queued jobs as files in spool\PRINTERS; with the service stopped they can be deleted. If the
+    /// service cannot be stopped nothing is deleted.
+    /// </summary>
+    private static Task<string?> ClearPrintQueue()
+    {
+        var spool = Path.Combine(Environment.SystemDirectory, "spool", "PRINTERS");
+        var commands = string.Join("&",
+            $"net stop spooler /y && (del /q /f \"{spool}\\*\" & echo 已清除等待中的列印工作。)" +
+            " || echo 無法停止列印服務，沒有清除任何工作。",
+            "net start spooler",
+            "echo.", "echo 完成，請重新列印需要的文件；可以關閉這個視窗。");
+        return RunInConsole("清除列印工作", commands);
+    }
+
+    /// <summary>
+    /// Asks the Windows Time service to sync now: with the domain controller on a company domain, otherwise with the
+    /// configured time server (time.windows.com by default). The status afterwards shows the source and the last sync.
+    /// </summary>
+    private static Task<string?> SyncTime()
+    {
+        var commands = string.Join("&",
+            "net start w32time >nul 2>&1",
+            "w32tm /resync && echo 已和時間伺服器對時。" +
+            " || echo 對時失敗：可能沒有網路、公司網路擋住了時間伺服器，或 Windows 時間服務被停用，請交給資訊人員處理。",
+            "echo.", "w32tm /query /status",
+            "echo.", "echo 完成，可以關閉這個視窗。");
+        return RunInConsole("校正電腦時間", commands);
     }
 
     private async Task<string?> RebuildIconCacheAsync()
