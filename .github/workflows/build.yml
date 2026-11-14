@@ -1,0 +1,37 @@
+# 每次推送或開 PR 時在 Windows 上建置並執行單元測試。
+# 打包安裝檔需要 Inno Setup 與使用說明書（Word），仍在本機用 installer\build-installer.ps1 進行。
+name: 建置與測試
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 建置與測試（Windows）
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: 建置
+        run: dotnet build PcMaintenance.slnx -c Release --nologo
+
+      - name: 單元測試
+        run: dotnet test tests/PcMaintenance.Core.Tests -c Release --no-build --nologo --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: 上傳測試結果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
