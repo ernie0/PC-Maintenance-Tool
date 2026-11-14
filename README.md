@@ -34,7 +34,8 @@ Windows 10／11 的電腦維護程式，介面為繁體中文：一鍵維護、�
 | 記憶體 | 記憶體與虛擬記憶體用量、最占記憶體的程式、已安裝的模組與插槽數；「釋放記憶體」、排定 Windows 記憶體檢測 |
 | 系統調校 | 18 個 Windows 設定開關（效能：遊戲模式、GPU 排程、快速啟動、透明效果、儲存空間感知；檔案總管：副檔名、隱藏檔、完整右鍵選單、工作列等；隱私：廣告識別碼、推薦內容、活動記錄、診斷資料等）與電源計畫（可加入終極效能）。每次切換都記在變更紀錄，可還原 |
 | 系統工具 | 修復：SFC、DISM RestoreHealth、清理更新元件、重設 Windows 更新、重設 Winsock、備份驅動程式（在系統管理員命令視窗執行）；擷取網路封包（Windows 內建封包監視器，最多 5 分鐘，存成 Wireshark 可開啟的 .pcapng）；快速處理：清除 DNS 快取、重建圖示快取、重新啟動檔案總管、重新啟動顯示卡驅動程式、重設 Microsoft Store、清除卡住的列印工作、校正電腦時間；還原點；Windows 內建管理工具捷徑（含上帝模式） |
-| 電腦資訊 | Windows 版本、功能更新與組建、安裝日期；電腦製造商、型號、序號、主機板、BIOS、安全開機；處理器、記憶體模組、顯示卡、磁碟、網路卡；上次安裝 Windows 更新的日期與失敗的更新、裝置管理員中有問題的裝置、筆電電池健康度（目前充飽容量對原始容量）、印表機；安全性設定（防火牆、BitLocker、遠端桌面、SMBv1、使用者帳戶控制、自動登入、Guest 與系統管理員帳號）；最近 30 天的穩定度（藍色畫面、不正常關機、磁碟與硬體錯誤、常當機的程式）。可複製全部，或匯出 CSV（一台一列，方便彙整多台電腦），或匯出一頁可列印的「電腦健檢報告」（需要注意的事項排在最前面） |
+| 電腦資訊 | Windows 版本、功能更新與組建、安裝日期；電腦製造商、型號、序號、主機板、BIOS、安全開機；處理器、記憶體模組、顯示卡、磁碟、網路卡；上次安裝 Windows 更新的日期與失敗的更新、裝置管理員中有問題的裝置、筆電電池健康度（目前充飽容量對原始容量）、印表機；安全性設定（防火牆、BitLocker、遠端桌面、SMBv1、使用者帳戶控制、自動登入、Guest 與系統管理員帳號）；最近 30 天的穩定度（藍色畫面、不正常關機、磁碟與硬體錯誤、常當機的程式）。可複製全部，或匯出 CSV（一台一列，含各磁碟的剩餘空間，可在「多台電腦」頁彙整），或匯出一頁可列印的「電腦健檢報告」（需要注意的事項排在最前面） |
+| 多台電腦 | 讀取一個資料夾（通常是共用資料夾）裡各台電腦用 `--export-system` 匯出的電腦配備 CSV，一台電腦一列：Windows 版本、上次 Windows 更新、最少的剩餘空間，以及需要注意的事項（太久沒更新、更新安裝失敗、磁碟快滿或健康警告、有問題的裝置、電池老化、安全性設定、最近 30 天的藍色畫面與不正常關機、資料太久沒更新），需要注意的電腦排在前面並標色；同一台電腦有多份檔案時只看最新的一份。可匯出彙整表 CSV。只讀取選定資料夾裡的檔案，不會連到其他電腦 |
 | 變更紀錄 | 上面做過的系統變更都會記錄，選取後可以還原 |
 
 | 一鍵維護進度 | 系統調校 |
@@ -42,6 +43,8 @@ Windows 10／11 的電腦維護程式，介面為繁體中文：一鍵維護、�
 | ![一鍵維護進度小視窗](docs/manual/images/01-一鍵維護-進度視窗.png) | ![系統調校](docs/manual/images/13-系統調校.png) |
 | **磁碟分析** | **變更紀錄** |
 | ![磁碟分析](docs/manual/images/08-磁碟分析-空間.png) | ![變更紀錄](docs/manual/images/16-變更紀錄.png) |
+| **多台電腦（範例資料）** | **軟體更新** |
+| ![多台電腦](docs/manual/images/21-多台電腦.png) | ![軟體更新](docs/manual/images/22-軟體更新.png) |
 
 ## 安全設計
 
@@ -89,7 +92,7 @@ Windows 10／11 64 位元。完整版安裝檔已內含 .NET 執行環境，不�
 靜默安裝（例如用派送工具或登入指令碼）：
 
 ```bat
-PcMaintenance-Setup-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS="\\伺服器\共用\settings.json" /TASKS="autoclean"
+PcMaintenance-Setup-0.6.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS="\\伺服器\共用\settings.json" /TASKS="autoclean"
 ```
 
 | 參數 | 用途 |
@@ -142,6 +145,12 @@ PcMaintenance-Setup-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS
 "C:\Program Files\PcMaintenance\PcMaintenance.exe" --export-software "\\伺服器\共用\軟體盤點\"
 ```
 
+各台電腦定期（派送工具、登入指令碼或排程）把電腦配備匯出到同一個共用資料夾，再到「多台電腦」頁選這個資料夾，就是一張全公司電腦的狀態表：
+
+```bat
+"C:\Program Files\PcMaintenance\PcMaintenance.exe" --export-system "\\伺服器\共用\電腦盤點\"
+```
+
 ## 公司設定檔
 
 程式依序讀取第一個存在的設定檔：
@@ -152,6 +161,8 @@ PcMaintenance-Setup-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS
 都沒有時使用預設值。範例與每個欄位的說明在 `C:\ProgramData\PcMaintenance\settings.example.json`（原始檔在 [installer/settings.example.json](installer/settings.example.json)），內容與預設值相同，可以複製成 `settings.json` 再改。格式錯誤時程式會改用預設值，並在畫面上方顯示提醒。程式左下角會顯示「設定：預設值」或「設定：公司設定檔」，實際讀取的路徑記在每日記錄檔。
 
 軟體更新：`allowSoftwareUpdates` 預設 `true`；由公司統一派送、管理軟體版本的電腦可以設成 `false`，「軟體更新」分頁就不能檢查或更新。
+
+多台電腦：`inventoryFolder` 填各台電腦存放電腦配備檔的資料夾（例如 `\\伺服器\共用\電腦盤點`），「多台電腦」頁一開啟就讀取它；使用者自己選過資料夾後，改用使用者上次選的。預設空白，由使用者自己選。
 
 可疑 IP 清單：`suspiciousAddressList` 填一個文字檔路徑（相對路徑以 `C:\ProgramData\PcMaintenance` 為準），檔案每行一個 IP 或網段（例如 `203.0.113.7`、`198.51.100.0/24`），`#` 之後是註解。設定後工作管理員的網路頁會多一個「可疑連線」篩選，連到清單內位址的連線以紅底標示，匯出的 CSV 也有「可疑 IP」欄。清單由公司自行維護，程式不會自動下載。
 
@@ -164,6 +175,7 @@ PcMaintenance-Setup-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS
 - `logs\`：每日操作記錄
 - `auto-clean.json`：上次自動清理的時間與結果
 - `maintenance.json`：上次一鍵維護的時間、處理項數與釋放空間
+- `fleet-folder.txt`：「多台電腦」頁上次選的資料夾
 
 解除安裝不會刪除這些資料，避免之後無法還原。
 
@@ -181,6 +193,7 @@ PcMaintenance-Setup-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SETTINGS
 
 - 軟體更新要靠 Windows 的套件管理員 winget（Windows 10 1809 以後、Windows 11 從 Microsoft Store 的「應用程式安裝程式」取得；LTSC 版與 Windows Server 沒有），而且只找得到 winget 軟體來源裡有的軟體。
 
+- 「多台電腦」只看得到各台電腦匯出檔裡有的欄位：0.5.0 以前匯出的檔案沒有「磁碟空間」，0.4.0 以前的也沒有更新、裝置與安全性欄位，這些欄位會顯示「—」，各台電腦換成新版再匯出一次即可。資料多新，取決於各台電腦多久匯出一次；超過 14 天沒有新檔案的電腦會標示「資料已經 N 天沒有更新」。
 - 程式與安裝檔沒有數位簽章：從網路下載的副本會出現 SmartScreen 警告，部分防毒軟體可能需要加入例外。
 - 精簡版在沒有 .NET 10 的電腦上第一次安裝需要網路（使用系統的 Proxy 設定）；公司網路擋 Microsoft 下載站時請改用完整版。
 - 網路診斷的「能不能上網」與「電腦時間」要連到 Microsoft 的連線測試網址與 time.windows.com；公司網路擋住時這兩項會顯示略過或失敗，不代表電腦本身有問題。時間伺服器用的是 UDP 123，常被公司防火牆擋住。
