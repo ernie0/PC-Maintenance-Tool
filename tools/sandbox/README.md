@@ -23,6 +23,7 @@ pwsh -File tools\sandbox\Run-SandboxTest.ps1 -Test system-changes
 | `system-changes` | 舊版 Windows 交給磁碟清理移除（不會經由連結刪到 C:\Users）、傳遞最佳化快取、清除卡住的列印工作、時間差 10 分鐘時網路診斷能發現並由「校正電腦時間」修正 | 3～5 分鐘（需要網路） |
 
 | `health-report` | 系統管理員才讀得到的磁碟加密、開機時間，一鍵維護的系統穩定度與安全性設定，命令列匯出健檢報告並用 Edge 轉成圖片 | 1 分鐘 |
+| `software-update` | 軟體更新：先從 GitHub 裝 winget、刻意裝舊一版的 7-Zip，再從「軟體更新」分頁檢查、選取、按「更新」並確認，7-Zip 要變新版、重新檢查後不再列出 | 8 分鐘（需要網路） |
 | `installer-upgrade` | 靜默安裝舊版（公司設定檔＋自動清理）→ 靜默升級新版 → 設定與自動清理保留、說明書與設定範例更新 → 命令列匯出 → 靜默解除安裝。要加 `-Installers <資料夾>`，放新舊兩個完整版安裝檔 | 2 分鐘 |
 
 另外要加上 Sandbox 開機與登入的 1～3 分鐘。視窗出現「與 Windows 沙箱環境的連線已中斷」時，工具會自動按「重新連線」。
