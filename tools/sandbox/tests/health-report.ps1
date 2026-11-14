@@ -15,8 +15,10 @@ try {
   $null = Wait-Until { Texts | Where-Object { $_ -eq '上次更新' } } 60
   Start-Sleep -Seconds 2
   $encryption = Texts | Where-Object { $_ -like '系統磁碟*加密*' -or $_ -like '*BitLocker*' -or $_ -like '以系統管理員重新啟動後*' } | Select-Object -First 1
-  Check '系統管理員讀得到磁碟加密狀態' ([bool]$encryption -and $encryption -notlike '以系統管理員*') "$encryption"
-  Log "  穩定度：$((Texts | Where-Object { $_ -like '沒有*' -or $_ -match '^\d+ 次' }) -join ' ／ ')"
+  # What Windows itself says, to compare with: manage-bde and the same WMI class.
+  Log "  manage-bde：$(((manage-bde -status C: 2>&1) | Where-Object { $_.Trim() } | Select-Object -First 8 | ForEach-Object { $_.Trim() }) -join '；')"
+  Check '系統管理員讀得到磁碟加密狀態' ($encryption -in '系統磁碟已用 BitLocker 加密', '系統磁碟沒有加密', '這個 Windows 版本沒有 BitLocker', '系統磁碟不支援 BitLocker（例如虛擬機器的磁碟）') "$encryption"
+  Check '虛擬機器裡也列出網路卡' ([bool](Texts | Where-Object { $_ -eq '網路介面卡' }))
   Shot 'computer-info'
 
   Select-Item '開機與背景' $CT::ListItem
@@ -28,7 +30,7 @@ try {
   Press (Find-El '一鍵掃描' $CT::Button)
   $null = Wait-Until { Texts | Where-Object { $_ -eq '這台電腦狀態良好' -or $_ -like '發現 * 項可以一鍵處理*' -or $_ -like '有 * 項建議，請看下方說明' } } 300
   Start-Sleep -Seconds 2
-  $stability = Texts | Where-Object { $_ -like '最近 30 天*' -or $_ -like '無法讀取 Windows 事件記錄' } | Select-Object -First 1
+  $stability = Texts | Where-Object { $_ -like '最近 30 天沒有*' -or $_ -like '最近 30 天有 *' -or $_ -like '無法讀取 Windows 事件記錄' } | Select-Object -First 1
   $security = Texts | Where-Object { $_ -like '*安全性設定建議調整' -or $_ -eq '防火牆、使用者帳戶控制等設定正常' } | Select-Object -First 1
   Check '一鍵維護：系統穩定度有結果' ([bool]$stability) "$stability"
   Check '一鍵維護：安全性設定有結果' ([bool]$security) "$security"

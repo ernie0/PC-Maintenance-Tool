@@ -50,13 +50,13 @@ public class ReportTests
     {
         var safe = SecurityChecks.Evaluate(new SecuritySettings
         {
-            DomainFirewall = true, PrivateFirewall = true, PublicFirewall = true, SystemDriveEncrypted = true, Administrators = ["PC\\admin"],
+            DomainFirewall = true, PrivateFirewall = true, PublicFirewall = true, SystemDrive = DiskEncryption.Encrypted, Administrators = ["PC\\admin"],
         }, isElevated: true, isLaptop: true);
         Assert.DoesNotContain(safe, s => s.Result is DiagnosisResult.Warning or DiagnosisResult.Fail);
 
         var risky = SecurityChecks.Evaluate(new SecuritySettings
         {
-            DomainFirewall = true, PrivateFirewall = false, PublicFirewall = false, SystemDriveEncrypted = false,
+            DomainFirewall = true, PrivateFirewall = false, PublicFirewall = false, SystemDrive = DiskEncryption.NotEncrypted,
             RemoteDesktopOn = true, RemoteDesktopNla = false, Smb1ClientOn = true, UacOn = false,
             AutoLogon = true, AutoLogonPasswordStored = true, GuestEnabled = true,
         }, isElevated: true, isLaptop: true);
@@ -76,7 +76,7 @@ public class ReportTests
     {
         var steps = SecurityChecks.Evaluate(new SecuritySettings
         {
-            OtherFirewalls = ["ESET Firewall"], DomainFirewall = false, PrivateFirewall = false, PublicFirewall = false, SystemDriveEncrypted = false,
+            OtherFirewalls = ["ESET Firewall"], DomainFirewall = false, PrivateFirewall = false, PublicFirewall = false, SystemDrive = DiskEncryption.NotEncrypted,
         }, isElevated: true, isLaptop: false);
         Assert.Equal(DiagnosisResult.Pass, Find(steps, "防火牆").Result);
         Assert.Equal(DiagnosisResult.Info, Find(steps, "磁碟加密").Result);

@@ -151,7 +151,9 @@ public static class SystemInfoReader
         var adapters = new List<NetworkAdapterInfo>();
         foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces())
         {
-            if (!NetworkActivitySampler.IsShown(adapter.NetworkInterfaceType, adapter.Description, adapter.OperationalStatus)) continue;
+            // Virtual cards are left out (Hyper-V switches, VPNs) unless one is the way out: inside a virtual machine
+            // or virtual desktop the only card is virtual.
+            if (!NetworkActivitySampler.IsShown(adapter.NetworkInterfaceType, adapter.Description, adapter.OperationalStatus) && !HasDefaultGateway(adapter)) continue;
             List<string> v4 = [], v6 = [];
             try
             {
@@ -169,6 +171,20 @@ public static class SystemInfoReader
             adapters.Add(new NetworkAdapterInfo(adapter.Id, adapter.Name, adapter.Description, kind, adapter.Speed, mac, v4, v6));
         }
         return adapters;
+    }
+
+    private static bool HasDefaultGateway(NetworkInterface adapter)
+    {
+        if (adapter.OperationalStatus != OperationalStatus.Up || adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+            return false;
+        try
+        {
+            return adapter.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(System.Net.IPAddress.Any));
+        }
+        catch (NetworkInformationException)
+        {
+            return false;
+        }
     }
 
     private static void Query(string wql, Action<ManagementObject> read)

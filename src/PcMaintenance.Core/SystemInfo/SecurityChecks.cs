@@ -7,6 +7,19 @@ using PcMaintenance.Core.Network;
 
 namespace PcMaintenance.Core.SystemInfo;
 
+public enum DiskEncryption
+{
+    /// <summary>Only administrators may ask.</summary>
+    NeedsElevation,
+    Encrypted,
+    NotEncrypted,
+    /// <summary>BitLocker answered but does not list the system drive (for example a virtual machine's disk).</summary>
+    NotSupported,
+    /// <summary>No BitLocker on this edition (Windows Home).</summary>
+    NoBitLocker,
+    Unreadable,
+}
+
 /// <summary>Registry values the checks read, so the judgement can be tested apart from the machine.</summary>
 public sealed record SecuritySettings
 {
@@ -16,9 +29,7 @@ public sealed record SecuritySettings
     public bool? DomainFirewall { get; init; }
     public bool? PrivateFirewall { get; init; }
     public bool? PublicFirewall { get; init; }
-    /// <summary>System drive encryption: true on, false off, null unknown (needs elevation, or no BitLocker on this edition).</summary>
-    public bool? SystemDriveEncrypted { get; init; }
-    public bool BitLockerAvailable { get; init; } = true;
+    public DiskEncryption SystemDrive { get; init; } = DiskEncryption.NeedsElevation;
     public bool RemoteDesktopOn { get; init; }
     public bool RemoteDesktopNla { get; init; } = true;
     public bool Smb1ClientOn { get; init; }
@@ -56,17 +67,18 @@ public static class SecurityChecks
                     "到「系統工具」的「Windows 防火牆」把防火牆開啟；公司有其他防火牆政策時請先問資訊人員"));
         }
 
-        steps.Add(!s.BitLockerAvailable
-            ? new("磁碟加密", DiagnosisResult.Info, "這個 Windows 版本沒有 BitLocker")
-            : s.SystemDriveEncrypted switch
-            {
-                true => new("磁碟加密", DiagnosisResult.Pass, "系統磁碟已用 BitLocker 加密"),
-                false => isLaptop
-                    ? new("磁碟加密", DiagnosisResult.Warning, "系統磁碟沒有加密，筆電遺失時裡面的資料可能被讀走",
-                        "在「設定」→「隱私權與安全性」→「裝置加密」或控制台的「BitLocker 磁碟機加密」開啟，並把修復金鑰交給資訊人員保管")
-                    : new("磁碟加密", DiagnosisResult.Info, "系統磁碟沒有加密"),
-                null => new("磁碟加密", DiagnosisResult.Info, isElevated ? "無法讀取 BitLocker 狀態" : "以系統管理員重新啟動後才能讀取"),
-            });
+        steps.Add(s.SystemDrive switch
+        {
+            DiskEncryption.Encrypted => new("磁碟加密", DiagnosisResult.Pass, "系統磁碟已用 BitLocker 加密"),
+            DiskEncryption.NotEncrypted => isLaptop
+                ? new("磁碟加密", DiagnosisResult.Warning, "系統磁碟沒有加密，筆電遺失時裡面的資料可能被讀走",
+                    "在「設定」→「隱私權與安全性」→「裝置加密」或控制台的「BitLocker 磁碟機加密」開啟，並把修復金鑰交給資訊人員保管")
+                : new("磁碟加密", DiagnosisResult.Info, "系統磁碟沒有加密"),
+            DiskEncryption.NotSupported => new("磁碟加密", DiagnosisResult.Info, "系統磁碟不支援 BitLocker（例如虛擬機器的磁碟）"),
+            DiskEncryption.NoBitLocker => new("磁碟加密", DiagnosisResult.Info, "這個 Windows 版本沒有 BitLocker"),
+            DiskEncryption.Unreadable => new("磁碟加密", DiagnosisResult.Info, "無法讀取 BitLocker 狀態"),
+            _ => new("磁碟加密", DiagnosisResult.Info, "以系統管理員重新啟動後才能讀取"),
+        });
 
         steps.Add(!s.RemoteDesktopOn
             ? new("遠端桌面", DiagnosisResult.Pass, "已關閉")
@@ -110,15 +122,13 @@ public static class SecurityChecks
     {
         var lm = Registry.LocalMachine;
         var winlogon = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
-        var (encrypted, bitLockerAvailable) = ReadBitLocker(isElevated);
         return new SecuritySettings
         {
             OtherFirewalls = ReadOtherFirewalls(),
             DomainFirewall = FirewallOn("DomainProfile", "DomainProfile"),
             PrivateFirewall = FirewallOn("StandardProfile", "PrivateProfile"),
             PublicFirewall = FirewallOn("PublicProfile", "PublicProfile"),
-            SystemDriveEncrypted = encrypted,
-            BitLockerAvailable = bitLockerAvailable,
+            SystemDrive = isElevated ? ReadBitLocker() : DiskEncryption.NeedsElevation,
             RemoteDesktopOn = Value(lm, @"SYSTEM\CurrentControlSet\Control\Terminal Server", "fDenyTSConnections") is 0,
             RemoteDesktopNla = Value(lm, @"SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp", "UserAuthentication") is not 0,
             // The SMB 1.0 client driver exists only while the optional feature is installed; start type 4 means disabled.
@@ -152,32 +162,39 @@ public static class SecurityChecks
         return names.Distinct().ToList();
     }
 
-    /// <returns>Encrypted (null when unknown) and whether this edition has BitLocker at all.</returns>
-    private static (bool? Encrypted, bool Available) ReadBitLocker(bool isElevated)
+    private static DiskEncryption ReadBitLocker()
     {
         var drive = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "C:";
-        if (!isElevated) return (null, true);
-        bool? encrypted = null;
-        var available = true;
+        var state = DiskEncryption.NotSupported;
         try
         {
-            using var searcher = new ManagementObjectSearcher(@"root\CIMV2\Security\MicrosoftVolumeEncryption",
-                $"SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter = '{drive}'");
+            // This namespace refuses connections that are not encrypted (packet privacy), even from an administrator.
+            var scope = new ManagementScope(@"\\.\root\CIMV2\Security\MicrosoftVolumeEncryption",
+                new ConnectionOptions { Authentication = AuthenticationLevel.PacketPrivacy });
+            using var searcher = new ManagementObjectSearcher(scope,
+                new ObjectQuery($"SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter = '{drive}'"));
             using var results = searcher.Get();
             foreach (var item in results.Cast<ManagementObject>())
             {
                 // 0 off, 1 on, 2 unknown (for example locked).
-                using (item) encrypted = Convert.ToUInt32(item["ProtectionStatus"] ?? 2u) switch { 0 => false, 1 => true, _ => null };
+                using (item)
+                    state = Convert.ToUInt32(item["ProtectionStatus"] ?? 2u) switch
+                    {
+                        0 => DiskEncryption.NotEncrypted,
+                        1 => DiskEncryption.Encrypted,
+                        _ => DiskEncryption.Unreadable,
+                    };
             }
         }
-        catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.InvalidNamespace)
+        catch (ManagementException ex) when (ex.ErrorCode is ManagementStatus.InvalidNamespace or ManagementStatus.InvalidClass)
         {
-            available = false;
+            state = DiskEncryption.NoBitLocker;
         }
         catch (Exception ex) when (ex is ManagementException or COMException or UnauthorizedAccessException)
         {
+            state = DiskEncryption.Unreadable;
         }
-        return (encrypted, available);
+        return state;
     }
 
     private static bool ReadGuestEnabled()
