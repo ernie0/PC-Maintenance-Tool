@@ -164,5 +164,47 @@
                 </ContentControl>
             </Grid>
         </TabItem>
+
+        <TabItem Header="軟體更新" local:Glyph.Text="&#xE896;" local:Glyph.Motion="Bounce">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                    <Button DockPanel.Dock="Left" Content="檢查更新" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource PrimaryButton}"
+                            local:Glyph.Text="&#xE72C;" local:Glyph.Motion="Turn" local:Glyph.Busy="{Binding CheckUpdatesCommand.IsRunning}" />
+                    <Button DockPanel.Dock="Left" Content="更新" Command="{Binding UpdateSelectedCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE896;" ToolTip="用 winget 更新選取的軟體" />
+                    <Button DockPanel.Dock="Left" Content="全部更新" Command="{Binding UpdateAllCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            local:Glyph.Text="&#xE8B3;" ToolTip="用 winget 依序更新清單上的所有軟體" />
+                </DockPanel>
+                <TextBlock Grid.Row="1" Text="{Binding UpdateStatus}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                <Border Grid.Row="2" Background="{StaticResource AccentSoftBrush}" CornerRadius="10" Padding="12,8" Margin="0,0,0,10">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE946;" Style="{StaticResource IconText}" FontSize="15" Foreground="{StaticResource AccentBrush}"
+                                   VerticalAlignment="Top" Margin="0,1,10,0" />
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="13"
+                                       Text="用 Windows 內建的套件管理員 winget 查詢與更新，只找得到 winget 認得的軟體；只有按「檢查更新」時才會連到 winget 的軟體來源。更新在命令視窗進行，安裝程式要權限或授權條款時請在視窗中回答。由公司統一管理的軟體，更新前請先問資訊人員。" />
+                            <TextBlock Text="公司設定未開放軟體更新（allowSoftwareUpdates）。" Foreground="{StaticResource WarningTextBrush}" FontSize="13" Margin="0,4,0,0"
+                                       Visibility="{Binding UpdatesAllowed, Converter={StaticResource InverseBoolToVisibility}}" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <ContentControl Grid.Row="3" Style="{StaticResource Card}">
+                    <DataGrid ItemsSource="{Binding UpdateRows}" SelectedItem="{Binding SelectedUpdate}" EnableRowVirtualization="True" AutomationProperties.Name="可以更新的軟體">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="2*" MinWidth="160" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="目前版本" Binding="{Binding Version}" Width="130" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="新版本" Binding="{Binding Available}" Width="130" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="winget 識別碼" Binding="{Binding Id}" Width="1.3*" MinWidth="120" ElementStyle="{StaticResource CellText}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </ContentControl>
+            </Grid>
+        </TabItem>
     </TabControl>
 </UserControl>

@@ -20,6 +20,8 @@ public sealed record AppSettings
     public int AutoCleanIntervalDays { get; init; } = 7;
     /// <summary>File of IP addresses and ranges the network tab marks as suspicious; empty means none. A relative path is read from %ProgramData%\PcMaintenance.</summary>
     public string SuspiciousAddressList { get; init; } = "";
+    /// <summary>Whether the uninstall page may check for and run software updates through winget.</summary>
+    public bool AllowSoftwareUpdates { get; init; } = true;
 
     public static AppSettings Default { get; } = new();
 

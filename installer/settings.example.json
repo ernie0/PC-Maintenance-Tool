@@ -33,5 +33,9 @@
 
   // 「工作管理員 → 網路」要標示為可疑的 IP 位址清單檔，空白表示不使用。一行一個位址或範圍（例如 203.0.113.0/24），# 後面是註解。
   // 可以寫完整路徑（例如 "\\\\伺服器\\共用\\可疑IP.txt"），或只寫檔名，表示放在這個設定檔所在的資料夾（C:\ProgramData\PcMaintenance）。
-  "suspiciousAddressList": ""
+  "suspiciousAddressList": "",
+
+  // 「軟體解除安裝 → 軟體更新」是否開放：用 Windows 的套件管理員（winget）查詢並更新已安裝的軟體（查詢時會連到 winget 的軟體來源）。
+  // 由公司統一派送、管理軟體版本的電腦，可以設成 false 關閉。
+  "allowSoftwareUpdates": true
 }

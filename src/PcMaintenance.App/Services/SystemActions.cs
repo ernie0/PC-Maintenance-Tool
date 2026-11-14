@@ -26,6 +26,10 @@ public static class SystemActions
         }
     }
 
+    /// <summary>Runs commands in a console of this user that stays open; programs in it ask for elevation themselves.</summary>
+    public static bool RunInConsole(string title, string commands) =>
+        Open(Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/k title {title}&{commands}");
+
     /// <summary>Runs commands in an elevated console that stays open, so their progress and result can be read there.</summary>
     public static bool RunInElevatedConsole(string title, string commands) =>
         Open(Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/k title {title}&{commands}", elevated: true);

@@ -29,7 +29,7 @@ public sealed partial class UninstallViewModel : PageViewModel
     public ObservableCollection<LeftoverRow> Leftovers { get; } = [];
     public ObservableCollection<StoreAppRow> StoreAppRows { get; } = [];
 
-    /// <summary>0 = desktop programs, 1 = built-in and Store apps (listed the first time the tab is opened).</summary>
+    /// <summary>0 = desktop programs, 1 = built-in and Store apps (listed the first time the tab is opened), 2 = software updates.</summary>
     [ObservableProperty]
     private int _selectedTab;
 
@@ -41,6 +41,77 @@ public sealed partial class UninstallViewModel : PageViewModel
     private string _storeStatus = "";
 
     private bool _storeLoaded;
+
+    public ObservableCollection<UpdateRow> UpdateRows { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckUpdatesCommand), nameof(UpdateSelectedCommand), nameof(UpdateAllCommand))]
+    private bool _isUpdateBusy;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UpdateSelectedCommand))]
+    private UpdateRow? _selectedUpdate;
+
+    [ObservableProperty]
+    private string _updateStatus = "按「檢查更新」查詢已安裝的軟體有沒有新版。";
+
+    /// <summary>The company settings can turn software updates off where IT manages software versions itself.</summary>
+    public bool UpdatesAllowed => _services.Settings.AllowSoftwareUpdates;
+
+    /// <summary>
+    /// Asks winget which programs have newer versions. Only on request: it contacts winget's catalogue on the internet.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCheckUpdates))]
+    private async Task CheckUpdatesAsync()
+    {
+        IsUpdateBusy = true;
+        UpdateStatus = "正在向 winget 查詢可以更新的軟體（會連到 winget 的軟體來源，約需幾秒到一分鐘）…";
+        try
+        {
+            var check = await Winget.CheckAsync();
+            UpdateRows.Clear();
+            foreach (var update in check.Updates.OrderBy(u => u.Name, StringComparer.CurrentCulture)) UpdateRows.Add(new UpdateRow(update));
+            UpdateStatus = !check.WingetFound
+                ? "這台電腦沒有 Windows 套件管理員（winget）。Windows 10／11 可以從 Microsoft Store 安裝「應用程式安裝程式」後再試；LTSC 版與 Windows Server 沒有提供。"
+                : check.Problem is { } problem ? problem
+                : check.Updates.Count == 0 ? $"已安裝的軟體都是最新版（{DateTime.Now:HH:mm} 查詢；只檢查 winget 認得的軟體）。"
+                : $"有 {check.Updates.Count} 個軟體可以更新（{DateTime.Now:HH:mm} 查詢）。選取一個按「更新」，或按「全部更新」。";
+            _services.Log.Info($"檢查軟體更新：{(check.Problem ?? $"{check.Updates.Count} 個可更新")}");
+        }
+        finally
+        {
+            IsUpdateBusy = false;
+        }
+    }
+
+    private bool CanCheckUpdates() => !IsUpdateBusy && UpdatesAllowed;
+    private bool CanUpdateSelected() => CanCheckUpdates() && SelectedUpdate is not null;
+    private bool CanUpdateAll() => CanCheckUpdates() && UpdateRows.Count > 0;
+
+    /// <summary>Updates one program in a console the user can watch and answer; winget asks for elevation per installer.</summary>
+    [RelayCommand(CanExecute = nameof(CanUpdateSelected))]
+    private void UpdateSelected()
+    {
+        if (SelectedUpdate?.Update is not { } update) return;
+        if (!Dialogs.Confirm($"會開啟命令視窗，用 winget 把「{update.Name}」從 {update.Version} 更新到 {update.Available}。\n\n" +
+                             "請先關閉這個軟體再更新。安裝程式可能會詢問系統管理員權限，或要你同意授權條款，請在命令視窗中回答。確定要更新嗎？", "更新軟體")) return;
+        RunUpdate($"更新「{update.Name}」", Winget.UpgradeCommand(update));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUpdateAll))]
+    private void UpdateAll()
+    {
+        if (!Dialogs.Confirm($"會開啟命令視窗，用 winget 依序更新清單上的 {UpdateRows.Count} 個軟體，可能需要一段時間，期間可能多次詢問系統管理員權限或授權條款。\n\n" +
+                             "請先存好工作並關閉要更新的軟體。由公司統一管理的軟體，請先問過資訊人員。確定要全部更新嗎？", "全部更新")) return;
+        RunUpdate($"更新 {UpdateRows.Count} 個軟體", Winget.UpgradeAllCommand);
+    }
+
+    private void RunUpdate(string what, string command)
+    {
+        var started = SystemActions.RunInConsole("更新軟體", $"{command}&echo.&echo 完成後可以關閉這個視窗，回到電腦維護工具按「檢查更新」確認結果。");
+        UpdateStatus = started ? $"已開啟命令視窗{what}；完成後按「檢查更新」確認結果。" : "無法開啟命令視窗。";
+        _services.Log.Info($"軟體更新：{what}（{command}）");
+    }
 
     partial void OnSelectedTabChanged(int value)
     {
@@ -374,6 +445,15 @@ public sealed class AppRow(InstalledApp app, bool isBroken)
     public bool Matches(string text) =>
         Name.Contains(text, StringComparison.CurrentCultureIgnoreCase) ||
         Publisher.Contains(text, StringComparison.CurrentCultureIgnoreCase);
+}
+
+/// <summary>A program winget can update, as listed on the software updates tab.</summary>
+public sealed record UpdateRow(SoftwareUpdate Update)
+{
+    public string Name => Update.Name;
+    public string Version => Update.Version;
+    public string Available => Update.Available;
+    public string Id => Update.Id;
 }
 
 public sealed partial class StoreAppRow(StoreApp app) : ObservableObject
