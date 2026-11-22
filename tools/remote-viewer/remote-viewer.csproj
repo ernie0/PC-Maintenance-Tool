@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- P1 控制端視窗（WPF）：顯示遠端畫面、把本機滑鼠鍵盤送過去、下拉切換螢幕。
+       之後會整併進電腦維護工具主程式成一個分頁。不隨安裝包派送。 -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PcMaintenance.Remote.Viewer\PcMaintenance.Remote.Viewer.csproj" />
+  </ItemGroup>
+
+</Project>
