@@ -1,0 +1,362 @@
+{
+  "Width": 1920,
+  "Height": 1080,
+  "AdapterName": "NVIDIA GeForce RTX 5060",
+  "Fps": 30,
+  "Seconds": 10,
+  "Bitrate": 4000000,
+  "results": [
+    {
+      "Scenario": "一般操作",
+      "Encoder": "NVIDIA H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 300,
+      "NewDesktopFrames": 198,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 2.900402333333332,
+        "P95": 6.4018,
+        "Max": 10.6899
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.4983073333333339,
+        "P95": 2.9537,
+        "Max": 6.4958
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": 5.077446666666631,
+        "P95": 7.645400000000336,
+        "Max": 28.45450000000028
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": 3.464204333333349,
+        "P95": 8.530300000000352,
+        "Max": 20.371500000001106
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": 13.429231000000012,
+        "P95": 21.985499999999774,
+        "Max": 35.153999999999996
+      },
+      "Mbps": 3.1332952,
+      "PsnrY": 47.64910210889027,
+      "CpuOneCorePct": 59.62527667630747,
+      "CpuMachinePct": 1.8632898961346085,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：NVIDIA GeForce RTX 5060",
+      "Error": null
+    },
+    {
+      "Scenario": "一般操作",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 4.5693,
+        "P95": 4.5693,
+        "Max": 4.5693
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.9925,
+        "P95": 1.9925,
+        "Max": 1.9925
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 1、已解碼 0、等待輸出 1、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "一般操作",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 7.3253,
+        "P95": 7.3253,
+        "Max": 7.3253
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.0979,
+        "P95": 1.0979,
+        "Max": 1.0979
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 1、已解碼 0、等待輸出 1、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "一般操作",
+      "Encoder": "H264 Encoder MFT",
+      "Hardware": false,
+      "Frames": 300,
+      "NewDesktopFrames": 234,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 3.660280666666665,
+        "P95": 7.0696,
+        "Max": 9.8476
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.784782333333333,
+        "P95": 2.773,
+        "Max": 4.5449
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": 4.098576666666659,
+        "P95": 5.103499999999713,
+        "Max": 24.394200000000005
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": 3.427511999999998,
+        "P95": 4.867900000000191,
+        "Max": 13.046699999999994
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": 13.452656666666659,
+        "P95": 18.270000000000437,
+        "Max": 43.9304
+      },
+      "Mbps": 3.9776504,
+      "PsnrY": 40.92114309376029,
+      "CpuOneCorePct": 52.721805875079255,
+      "CpuMachinePct": 1.6475564335962267,
+      "TimestampMismatches": 0,
+      "D3D": "",
+      "Error": null
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "NVIDIA H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 300,
+      "NewDesktopFrames": 123,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 1.834712666666667,
+        "P95": 5.8284,
+        "Max": 7.8553
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.9100023333333331,
+        "P95": 3.8631,
+        "Max": 5.2256
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": 5.499699666666673,
+        "P95": 9.69000000000051,
+        "Max": 62.32970000000023
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": 4.093259333333337,
+        "P95": 6.211499999999887,
+        "Max": 16.294699999999466
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": 13.854457000000009,
+        "P95": 20.907000000001062,
+        "Max": 72.88280000000032
+      },
+      "Mbps": 3.4255096000000003,
+      "PsnrY": 50.04793462704131,
+      "CpuOneCorePct": 46.250005550000665,
+      "CpuMachinePct": 1.4453126734375208,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：NVIDIA GeForce RTX 5060",
+      "Error": null
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 6.9465,
+        "P95": 6.9465,
+        "Max": 6.9465
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.4268,
+        "P95": 1.4268,
+        "Max": 1.4268
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 1、已解碼 0、等待輸出 1、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 2.3122,
+        "P95": 2.3122,
+        "Max": 2.3122
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 2.9977,
+        "P95": 2.9977,
+        "Max": 2.9977
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 1、已解碼 0、等待輸出 1、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "H264 Encoder MFT",
+      "Hardware": false,
+      "Frames": 300,
+      "NewDesktopFrames": 196,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 3.5986370000000005,
+        "P95": 7.7461,
+        "Max": 10.8702
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 2.1905716666666675,
+        "P95": 4.1151,
+        "Max": 5.7864
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": 4.175648999999998,
+        "P95": 5.3840000000000146,
+        "Max": 21.5489
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": 4.297726666666677,
+        "P95": 6.429299999999785,
+        "Max": 13.603000000000002
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": 15.119505000000002,
+        "P95": 21.86779999999999,
+        "Max": 42.7331
+      },
+      "Mbps": 4.2668175999999995,
+      "PsnrY": 43.62676576376643,
+      "CpuOneCorePct": 64.27354319557422,
+      "CpuMachinePct": 2.0085482248616944,
+      "TimestampMismatches": 0,
+      "D3D": "",
+      "Error": null
+    }
+  ]
+}

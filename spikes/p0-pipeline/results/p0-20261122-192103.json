@@ -1,0 +1,186 @@
+{
+  "Width": 1920,
+  "Height": 1080,
+  "AdapterName": "NVIDIA GeForce RTX 5060",
+  "Fps": 30,
+  "Seconds": 3,
+  "Bitrate": 4000000,
+  "results": [
+    {
+      "Scenario": "一般操作",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 0.25181764705882353,
+        "P95": 1.8689,
+        "Max": 1.8689
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.1470294117647057,
+        "P95": 6.3207,
+        "Max": 6.3207
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 17、已解碼 0、等待輸出 17、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "一般操作",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 2.5790647058823533,
+        "P95": 7.1981,
+        "Max": 7.1981
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 2.9614999999999996,
+        "P95": 5.8568,
+        "Max": 5.8568
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 17、已解碼 0、等待輸出 17、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 1.000570588235294,
+        "P95": 8.9442,
+        "Max": 8.9442
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.6062294117647062,
+        "P95": 2.8786,
+        "Max": 2.8786
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 17、已解碼 0、等待輸出 17、已送 drain False；其他事件：）"
+    },
+    {
+      "Scenario": "整頁捲動",
+      "Encoder": "Intel® Quick Sync Video H.264 Encoder MFT",
+      "Hardware": true,
+      "Frames": 0,
+      "NewDesktopFrames": 0,
+      "Capture": {
+        "Name": "擷取",
+        "Avg": 0.4601117647058823,
+        "P95": 7.0386,
+        "Max": 7.0386
+      },
+      "Convert": {
+        "Name": "轉換",
+        "Avg": 1.8114588235294118,
+        "P95": 3.1315,
+        "Max": 3.1315
+      },
+      "Encode": {
+        "Name": "編碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Decode": {
+        "Name": "解碼",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Total": {
+        "Name": "合計",
+        "Avg": "NaN",
+        "P95": "NaN",
+        "Max": "NaN"
+      },
+      "Mbps": 0,
+      "PsnrY": "NaN",
+      "CpuOneCorePct": 0,
+      "CpuMachinePct": 0,
+      "TimestampMismatches": 0,
+      "D3D": "D3D：Intel(R) UHD Graphics 770",
+      "Error": "TimeoutException: 5 秒沒有編碼器事件（已送 17、已解碼 0、等待輸出 17、已送 drain False；其他事件：）"
+    }
+  ]
+}
