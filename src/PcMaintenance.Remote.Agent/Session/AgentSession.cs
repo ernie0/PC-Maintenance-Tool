@@ -21,7 +21,7 @@ public sealed record AgentSessionOptions
 /// </summary>
 public sealed class AgentSession : IAsyncDisposable
 {
-    private readonly Stream _stream;
+    private readonly ISecureLink _link;
     private readonly AgentSessionOptions _opts;
     private readonly InputInjector _injector = new();
     private readonly Channel<(FrameType Type, byte[] Payload)> _outgoing =
@@ -35,19 +35,18 @@ public sealed class AgentSession : IAsyncDisposable
     private H264Encoder? _encoder;
     private volatile int _switchRequest = -1;
 
-    public AgentSession(Stream stream, AgentSessionOptions? options = null)
+    public AgentSession(ISecureLink link, AgentSessionOptions? options = null)
     {
-        _stream = stream;
+        _link = link;
         _opts = options ?? new AgentSessionOptions();
     }
 
-    /// <summary>交握完成、兩端可核對的六位數驗證碼確定後觸發一次，給上層顯示。</summary>
+    /// <summary>兩端可核對的六位數驗證碼，連線建立時觸發一次，給上層顯示。</summary>
     public event Action<string>? VerificationCodeReady;
 
     public async Task RunAsync(CancellationToken ct)
     {
-        using var session = await SecureSession.HandshakeAsync(_stream, isInitiator: false, ct).ConfigureAwait(false);
-        VerificationCodeReady?.Invoke(session.VerificationCode);
+        VerificationCodeReady?.Invoke(_link.VerificationCode);
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = linked.Token;
@@ -58,8 +57,8 @@ public sealed class AgentSession : IAsyncDisposable
         var captureThread = new Thread(() => CaptureLoop(token)) { IsBackground = true, Name = "agent-capture" };
         captureThread.Start();
 
-        var sendPump = SendPumpAsync(session, token);
-        var receiveLoop = ReceiveLoopAsync(session, token);
+        var sendPump = SendPumpAsync(_link, token);
+        var receiveLoop = ReceiveLoopAsync(_link, token);
 
         // 任一邊結束（連線關閉、取消、送出失敗）就收掉整條連線
         await Task.WhenAny(sendPump, receiveLoop).ConfigureAwait(false);
@@ -71,24 +70,24 @@ public sealed class AgentSession : IAsyncDisposable
             receiveLoop.ContinueWith(_ => { }, TaskScheduler.Default)).ConfigureAwait(false);
     }
 
-    private async Task SendPumpAsync(SecureSession session, CancellationToken ct)
+    private async Task SendPumpAsync(ISecureLink link, CancellationToken ct)
     {
         try
         {
             await foreach (var (type, payload) in _outgoing.Reader.ReadAllAsync(ct).ConfigureAwait(false))
-                await session.SendAsync(type, payload, ct).ConfigureAwait(false);
+                await link.SendAsync(type, payload, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
         catch (Exception) { /* 連線斷了，交由 RunAsync 收尾 */ }
     }
 
-    private async Task ReceiveLoopAsync(SecureSession session, CancellationToken ct)
+    private async Task ReceiveLoopAsync(ISecureLink link, CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                var msg = await session.ReceiveAsync(ct).ConfigureAwait(false);
+                var msg = await link.ReceiveAsync(ct).ConfigureAwait(false);
                 if (msg is null) break; // 控制端關閉連線
                 Dispatch(msg.Value.Type, msg.Value.Payload);
             }
@@ -213,6 +212,7 @@ public sealed class AgentSession : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         _outgoing.Writer.TryComplete();
+        _link.Dispose();
         return ValueTask.CompletedTask;
     }
 }

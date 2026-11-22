@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using PcMaintenance.Remote.Core.Transport;
 
 namespace PcMaintenance.Remote.Agent.Session;
 
@@ -35,10 +36,11 @@ public sealed class AgentListener
             {
                 using TcpClient client = await listener.AcceptTcpClientAsync(ct).ConfigureAwait(false);
                 client.NoDelay = true;
-                await using var session = new AgentSession(client.GetStream(), _options);
-                session.VerificationCodeReady += code => VerificationCodeReady?.Invoke(code);
                 try
                 {
+                    var link = await SecureSession.HandshakeAsync(client.GetStream(), isInitiator: false, ct).ConfigureAwait(false);
+                    await using var session = new AgentSession(link, _options);
+                    session.VerificationCodeReady += code => VerificationCodeReady?.Invoke(code);
                     await session.RunAsync(ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { }

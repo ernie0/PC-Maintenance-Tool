@@ -24,7 +24,8 @@ var agentTask = Task.Run(async () =>
 {
     using TcpClient conn = await listener.AcceptTcpClientAsync(cts.Token);
     conn.NoDelay = true;
-    await using var sess = new AgentSession(conn.GetStream(), new AgentSessionOptions { Fps = 30, BitrateKbps = 4000 });
+    var link = await PcMaintenance.Remote.Core.Transport.SecureSession.HandshakeAsync(conn.GetStream(), isInitiator: false, cts.Token);
+    await using var sess = new AgentSession(link, new AgentSessionOptions { Fps = 30, BitrateKbps = 4000 });
     sess.VerificationCodeReady += c => agentCode = c;
     try { await sess.RunAsync(cts.Token); } catch (OperationCanceledException) { }
 });

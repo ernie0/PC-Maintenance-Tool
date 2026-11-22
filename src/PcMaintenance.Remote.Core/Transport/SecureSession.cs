@@ -9,7 +9,7 @@ namespace PcMaintenance.Remote.Core.Transport;
 /// 之後所有資料都經 <see cref="SecureChannel"/> 加密。發起端與回應端一端傳 isInitiator=true、
 /// 另一端 false，收送金鑰才會對接。
 /// </summary>
-public sealed class SecureSession : IDisposable
+public sealed class SecureSession : ISecureLink
 {
     private readonly FramedConnection _conn;
     private readonly SecureChannel _channel;
