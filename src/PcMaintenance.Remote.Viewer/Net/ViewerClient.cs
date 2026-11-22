@@ -27,6 +27,8 @@ public sealed class ViewerClient : IDisposable
     public event Action<string>? VerificationCodeReady;
     public event Action<IReadOnlyList<MonitorDescriptor>>? MonitorListReceived;
     public event Action<RenderedFrame>? FrameRendered;
+    /// <summary>經伺服器連線獲被控端同意時觸發：(是否隱藏進行, 本次是否完成配對)。</summary>
+    public event Action<bool, bool>? SessionGranted;
 
     /// <summary>區網直連被控端並持續接收，直到連線關閉或取消。</summary>
     public async Task RunAsync(string host, int port, CancellationToken ct)
@@ -66,7 +68,7 @@ public sealed class ViewerClient : IDisposable
     /// </summary>
     public async Task RunViaServerAsync(Uri serverBase, string agentId, string adminName,
         string mode = SessionMode.Assist, bool requestHidden = false,
-        SignedAdminCertificate? certificate = null, CancellationToken ct = default)
+        AdminIdentity? identity = null, CancellationToken ct = default)
     {
         string requestId = Guid.NewGuid().ToString("N");
         using var kex = new KeyExchange();
@@ -82,7 +84,8 @@ public sealed class ViewerClient : IDisposable
             AdminName = adminName,
             TargetAgentId = agentId,
             ControllerPublicKey = kex.PublicKey,
-            Certificate = certificate,
+            Certificate = identity?.Certificate,
+            IdentitySignature = identity?.SignBinding(requestId, kex.PublicKey),
             RequestHidden = requestHidden,
         }, ct).ConfigureAwait(false);
 
@@ -92,6 +95,7 @@ public sealed class ViewerClient : IDisposable
         if (resp is not SessionConsentMessage consent)
             throw new SessionRejectedException("被控端回應無法解析");
 
+        SessionGranted?.Invoke(consent.Hidden, consent.PairingEstablished);
         SessionKeys keys = kex.DeriveKeys(consent.AgentPublicKey, isInitiator: true);
 
         using var relayWs = new ClientWebSocket();

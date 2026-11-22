@@ -60,6 +60,11 @@ public sealed record SessionRequestMessage : ControlMessage
     /// <summary>管理者憑證（無人值守／管理用）；有人值守協助可為 null、改用一次性密碼。</summary>
     public SignedAdminCertificate? Certificate { get; init; }
     /// <summary>
+    /// 用管理者身分私鑰簽的綁定值（簽 RequestId‖ControllerPublicKey），證明真的握有憑證對應的身分私鑰。
+    /// 被控端用它確認是同一位管理者，配對與隱藏模式都靠它；有 Certificate 時才有意義。
+    /// </summary>
+    public byte[]? IdentitySignature { get; init; }
+    /// <summary>
     /// 要求進入隱藏模式。被控端只有在這台已與此控制端完成配對（雙方都同意過一次）時才接受；
     /// 未配對時忽略此旗標，一律照正常模式顯示提示並請對方同意。
     /// </summary>
