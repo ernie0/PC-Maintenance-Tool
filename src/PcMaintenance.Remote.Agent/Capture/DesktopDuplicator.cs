@@ -53,6 +53,8 @@ public sealed unsafe class DesktopDuplicator : IDisposable
                             Index = index++,
                             DeviceName = desc.DeviceName,
                             AdapterName = adapter.Description1.Description,
+                            Left = b.Left,
+                            Top = b.Top,
                             Width = b.Right - b.Left,
                             Height = b.Bottom - b.Top,
                             IsPrimary = b.Left == 0 && b.Top == 0,

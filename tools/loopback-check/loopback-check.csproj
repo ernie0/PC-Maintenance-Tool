@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 端對端驗證工具：同程序內起被控端與控制端、走 127.0.0.1，證實
+       擷取→編碼→加密傳輸→解碼→BGRA 整條管線。存解好的畫面成 PPM 供人工確認。不隨安裝包派送。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PcMaintenance.Remote.Agent\PcMaintenance.Remote.Agent.csproj" />
+    <ProjectReference Include="..\..\src\PcMaintenance.Remote.Viewer\PcMaintenance.Remote.Viewer.csproj" />
+  </ItemGroup>
+
+</Project>

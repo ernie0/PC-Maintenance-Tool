@@ -32,6 +32,9 @@ public sealed unsafe class H264Encoder : IDisposable
     public string EncoderName { get; private set; } = "";
     public bool IsHardware { get; private set; }
 
+    /// <summary>背景編碼執行緒若因例外停止，保留該例外供呼叫端診斷。</summary>
+    public Exception? FaultException { get; private set; }
+
     /// <summary>自我測試後選定編碼器並啟動背景編碼。選不到可用編碼器時丟例外。</summary>
     public void Start()
     {
@@ -57,7 +60,7 @@ public sealed unsafe class H264Encoder : IDisposable
     /// <summary>送一張 NV12 畫面去編碼。內部複製一份，呼叫端的緩衝區可立即重用。</summary>
     public void Submit(ReadOnlySpan<byte> nv12, long timestampTicks)
     {
-        if (_faulted) throw new InvalidOperationException("編碼器已發生錯誤");
+        if (_faulted) throw new InvalidOperationException("編碼器已發生錯誤", FaultException);
         if (_input.IsAddingCompleted) return;
         byte[] copy = nv12.ToArray();
         try { _input.Add((copy, timestampTicks)); }
@@ -236,8 +239,9 @@ public sealed unsafe class H264Encoder : IDisposable
             if (_isAsync) RunAsync();
             else RunSync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            FaultException = ex;
             _faulted = true;
         }
     }

@@ -40,19 +40,28 @@ int captured = 0, changed = 0;
 var sw = Stopwatch.StartNew();
 long frameTicks = TimeSpan.TicksPerSecond / fps;
 int target = seconds * fps;
-for (int i = 0; i < target; i++)
+try
 {
-    double due = i * 1000.0 / fps;
-    while (sw.Elapsed.TotalMilliseconds < due) Thread.SpinWait(80);
-
-    if (capturer.TryGetNv12(5, nv12, out bool updated))
+    for (int i = 0; i < target; i++)
     {
-        captured++;
-        if (updated) changed++;
-        encoder.Submit(nv12, i * frameTicks); // 不論是否更新都送，維持固定幀率的錄影
+        double due = i * 1000.0 / fps;
+        while (sw.Elapsed.TotalMilliseconds < due) Thread.SpinWait(80);
+
+        if (capturer.TryGetNv12(5, nv12, out bool updated))
+        {
+            captured++;
+            if (updated) changed++;
+            encoder.Submit(nv12, i * frameTicks); // 不論是否更新都送，維持固定幀率的錄影
+        }
+        if ((i + 1) % fps == 0)
+            Console.WriteLine($"  第 {(i + 1) / fps} 秒：擷取 {captured}（有變 {changed}），已編碼 {encoded}");
     }
-    if ((i + 1) % fps == 0)
-        Console.WriteLine($"  第 {(i + 1) / fps} 秒：擷取 {captured}（有變 {changed}），已編碼 {encoded}");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"！擷取迴圈中止：{ex.Message}");
+    if (encoder.FaultException is { } fe)
+        Console.WriteLine($"！編碼器背景例外：{fe}");
 }
 Console.WriteLine("擷取迴圈結束，排空編碼器…");
 encoder.Stop();
