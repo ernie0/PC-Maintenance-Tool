@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PcMaintenance.Core\PcMaintenance.Core.csproj" />
+    <ProjectReference Include="..\PcMaintenance.Remote.Viewer\PcMaintenance.Remote.Viewer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
