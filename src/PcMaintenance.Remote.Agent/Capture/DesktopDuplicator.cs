@@ -21,6 +21,16 @@ public sealed unsafe class DesktopDuplicator : IDisposable
     private IDXGIOutputDuplication _duplication = null!;
     private ID3D11Texture2D _staging = null!;
 
+    // 游標合成：DXGI 擷取不含硬體游標，必須自己把游標畫進畫面，控制端才看得到自己指到哪裡。
+    private byte[] _lastBgra = [];   // 最近一張桌面（緊密排列、不含游標），游標動但畫面沒變時用它重畫
+    private byte[] _composed = [];   // 畫上游標後的輸出緩衝
+    private bool _hasFrame;
+    private int _cursorX, _cursorY;
+    private bool _cursorVisible;
+    private byte[] _cursorShape = [];
+    private int _curW, _curH, _curPitch, _curType;
+    private const int ShapeMonochrome = 1, ShapeColor = 2, ShapeMaskedColor = 4;
+
     public MonitorInfo Monitor { get; private set; } = null!;
     public int Width => Monitor.Width;
     public int Height => Monitor.Height;
@@ -117,6 +127,10 @@ public sealed unsafe class DesktopDuplicator : IDisposable
             BindFlags = BindFlags.None,
             CPUAccessFlags = CpuAccessFlags.Read,
         });
+        _lastBgra = new byte[Width * Height * 4];
+        _composed = new byte[Width * Height * 4];
+        _hasFrame = false;
+        _cursorVisible = false;
     }
 
     /// <summary>
@@ -137,27 +151,116 @@ public sealed unsafe class DesktopDuplicator : IDisposable
         }
         r.CheckError();
 
+        using var _ = resource; // 不論桌面有沒有變，取得的資源都要釋放
         try
         {
-            if (frameInfo.LastPresentTime == 0) return true; // 只有游標動，畫面沒變
-            using (resource)
-            using (var tex = resource.QueryInterface<ID3D11Texture2D>())
-                _context.CopyResource(_staging, tex);
-
-            var map = _context.Map(_staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
-            try
+            // 游標形狀更新（滑鼠換圖示時 PointerShapeBufferSize>0）
+            if (frameInfo.PointerShapeBufferSize > 0) UpdateCursorShape(frameInfo.PointerShapeBufferSize);
+            // 游標位置／可見度更新
+            if (frameInfo.LastMouseUpdateTime != 0)
             {
-                var bgra = new ReadOnlySpan<byte>((void*)map.DataPointer, (int)map.RowPitch * Height);
-                Nv12Converter.Convert(bgra, (int)map.RowPitch, Width, Height, nv12);
-                updated = true;
+                _cursorVisible = frameInfo.PointerPosition.Visible;
+                _cursorX = frameInfo.PointerPosition.Position.X;
+                _cursorY = frameInfo.PointerPosition.Position.Y;
             }
-            finally { _context.Unmap(_staging, 0); }
+
+            bool desktopChanged = frameInfo.LastPresentTime != 0;
+            bool mouseChanged = frameInfo.LastMouseUpdateTime != 0;
+
+            if (desktopChanged)
+            {
+                using (var tex = resource.QueryInterface<ID3D11Texture2D>())
+                    _context.CopyResource(_staging, tex);
+
+                var map = _context.Map(_staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+                try
+                {
+                    // 存成緊密排列的桌面快照（之後游標單獨移動時可直接重畫）
+                    byte* src = (byte*)map.DataPointer;
+                    int pitch = (int)map.RowPitch, rowBytes = Width * 4;
+                    fixed (byte* dst = _lastBgra)
+                        for (int y = 0; y < Height; y++)
+                            Buffer.MemoryCopy(src + (long)y * pitch, dst + (long)y * rowBytes, rowBytes, rowBytes);
+                    _hasFrame = true;
+                }
+                finally { _context.Unmap(_staging, 0); }
+            }
+
+            if (!_hasFrame) return true;                       // 還沒有任何畫面可送
+            if (!desktopChanged && !mouseChanged) return true; // 什麼都沒變
+
+            Array.Copy(_lastBgra, _composed, _lastBgra.Length);
+            if (_cursorVisible && _curW > 0 && _curH > 0) DrawCursor();
+            Nv12Converter.Convert(_composed, Width * 4, Width, Height, nv12);
+            updated = true;
         }
         finally
         {
             _duplication.ReleaseFrame();
         }
         return true;
+    }
+
+    private void UpdateCursorShape(uint bufferSize)
+    {
+        if (_cursorShape.Length < bufferSize) _cursorShape = new byte[bufferSize];
+        fixed (byte* p = _cursorShape)
+        {
+            _duplication.GetFramePointerShape(bufferSize, (nint)p, out _, out var info);
+            _curW = (int)info.Width;
+            _curH = (int)info.Height;
+            _curPitch = (int)info.Pitch;
+            _curType = (int)info.Type;
+        }
+    }
+
+    /// <summary>把快取的游標形狀合成到 _composed 的目前游標位置（支援彩色、遮罩彩色、單色三種）。</summary>
+    private void DrawCursor()
+    {
+        // 單色游標的高度是實際的兩倍（上半 AND 遮罩、下半 XOR 遮罩）
+        int shapeH = _curType == ShapeMonochrome ? _curH / 2 : _curH;
+        fixed (byte* shape = _cursorShape)
+        fixed (byte* frame = _composed)
+        {
+            for (int row = 0; row < shapeH; row++)
+            {
+                int fy = _cursorY + row;
+                if (fy < 0 || fy >= Height) continue;
+                for (int col = 0; col < _curW; col++)
+                {
+                    int fx = _cursorX + col;
+                    if (fx < 0 || fx >= Width) continue;
+                    byte* d = frame + ((long)fy * Width + fx) * 4;
+
+                    if (_curType == ShapeColor)
+                    {
+                        byte* s = shape + (long)row * _curPitch + col * 4;
+                        int a = s[3];
+                        if (a == 0) continue;
+                        d[0] = (byte)((s[0] * a + d[0] * (255 - a)) / 255);
+                        d[1] = (byte)((s[1] * a + d[1] * (255 - a)) / 255);
+                        d[2] = (byte)((s[2] * a + d[2] * (255 - a)) / 255);
+                    }
+                    else if (_curType == ShapeMaskedColor)
+                    {
+                        byte* s = shape + (long)row * _curPitch + col * 4;
+                        if (s[3] == 0) { d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }   // 不透明：直接蓋
+                        else { d[0] ^= s[0]; d[1] ^= s[1]; d[2] ^= s[2]; }          // 遮罩：XOR 反色
+                    }
+                    else // 單色
+                    {
+                        int bit = 7 - (col & 7);
+                        byte andMask = shape[(long)row * _curPitch + (col >> 3)];
+                        byte xorMask = shape[(long)(row + shapeH) * _curPitch + (col >> 3)];
+                        int and = (andMask >> bit) & 1, xor = (xorMask >> bit) & 1;
+                        if (and == 0 && xor == 0) { d[0] = d[1] = d[2] = 0; }        // 黑
+                        else if (and == 0 && xor == 1) { d[0] = d[1] = d[2] = 255; } // 白
+                        else if (and == 1 && xor == 1) { d[0] = (byte)~d[0]; d[1] = (byte)~d[1]; d[2] = (byte)~d[2]; } // 反色
+                        // (and=1,xor=0) 透明：保留
+                    }
+                }
+            }
+        }
     }
 
     private void Rebuild()

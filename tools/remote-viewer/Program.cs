@@ -39,6 +39,7 @@ internal sealed class ViewerWindow : Window
     private CancellationTokenSource? _cts;
     private WriteableBitmap? _bitmap;
     private bool _switchingList;
+    private string? _snapPath; private int _snapAfter = 60, _frameCount; private bool _snapped;
 
     public ViewerWindow(string[] cmdArgs)
     {
@@ -52,6 +53,14 @@ internal sealed class ViewerWindow : Window
         // 測試用：帶 --auto 時載入後自動按「連線」，方便本機重現。
         if (Array.IndexOf(cmdArgs, "--auto") >= 0)
             Loaded += async (_, _) => { await Task.Delay(500); ToggleConnect(); };
+
+        // 測試用：--snap <png路徑> [第幾張] 把收到的第 N 張畫面存成 PNG（驗證游標合成）後關閉。
+        int si = Array.IndexOf(cmdArgs, "--snap");
+        if (si >= 0 && si + 1 < cmdArgs.Length)
+        {
+            _snapPath = cmdArgs[si + 1];
+            if (si + 2 < cmdArgs.Length && int.TryParse(cmdArgs[si + 2], out int n)) _snapAfter = n;
+        }
 
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8) };
         bar.Children.Add(new TextBlock { Text = "位址", Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
@@ -153,6 +162,20 @@ internal sealed class ViewerWindow : Window
             _screen.Source = _bitmap;
         }
         _bitmap.WritePixels(new Int32Rect(0, 0, f.Width, f.Height), f.Bgra, f.Width * 4, 0);
+
+        if (_snapPath is not null && !_snapped && ++_frameCount >= _snapAfter)
+        {
+            _snapped = true;
+            try
+            {
+                using var snapFs = System.IO.File.Create(_snapPath);
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(_bitmap));
+                enc.Save(snapFs);
+            }
+            catch { }
+            Close();
+        }
     });
 
     // ---- 把本機輸入映射成遠端桌面的 0..65535 比例值 ----
