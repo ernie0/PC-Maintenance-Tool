@@ -34,6 +34,7 @@ internal sealed class ViewerWindow : Window
     private readonly TextBlock _code = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), FontWeight = FontWeights.Bold };
     private readonly ComboBox _monitors = new() { Width = 200, VerticalContentAlignment = VerticalAlignment.Center };
     private readonly Button _sendFile = new() { Content = "傳檔", Width = 56, Margin = new Thickness(12, 0, 0, 0) };
+    private readonly Button _remoteFiles = new() { Content = "遠端檔案", Width = 72, Margin = new Thickness(6, 0, 0, 0) };
     private readonly TextBlock _stats = new() { Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
     private readonly Image _screen = new() { Stretch = Stretch.Uniform, Focusable = true, SnapsToDevicePixels = true };
     private int _fpsFrames;
@@ -61,12 +62,35 @@ internal sealed class ViewerWindow : Window
             {
                 await Task.Delay(500);
                 ToggleConnect();
+                await Task.Delay(1500);
+                var c = _client;
+                if (c is null) return;
+                string bd = AppContext.BaseDirectory;
+
                 int fi = Array.IndexOf(cmdArgs, "--sendfile");
-                if (fi >= 0 && fi + 1 < cmdArgs.Length)
+                if (fi >= 0 && fi + 1 < cmdArgs.Length) await SendFileWithUiAsync(c, cmdArgs[fi + 1]);
+
+                int li = Array.IndexOf(cmdArgs, "--list");
+                if (li >= 0 && li + 1 < cmdArgs.Length)
                 {
-                    await Task.Delay(1500);
-                    var c = _client;
-                    if (c is not null) await SendFileWithUiAsync(c, cmdArgs[fi + 1]);
+                    c.RemoteFilesReceived += (p, entries) =>
+                    {
+                        try
+                        {
+                            var lines = new List<string> { "path=" + p, "count=" + entries.Count };
+                            lines.AddRange(entries.Select(e => (e.IsDirectory ? "[D] " : "[F] ") + e.Name + "  " + e.Size));
+                            System.IO.File.WriteAllLines(System.IO.Path.Combine(bd, "list-result.txt"), lines);
+                        }
+                        catch { }
+                    };
+                    await c.RequestRemoteListAsync(cmdArgs[li + 1]);
+                }
+
+                int pli = Array.IndexOf(cmdArgs, "--pull");
+                if (pli >= 0 && pli + 1 < cmdArgs.Length)
+                {
+                    c.FileReceived += p => { try { System.IO.File.AppendAllText(System.IO.Path.Combine(bd, "pull-result.txt"), p + System.Environment.NewLine); } catch { } };
+                    await c.RequestRemotePullAsync(cmdArgs[pli + 1]);
                 }
             };
 
@@ -89,8 +113,10 @@ internal sealed class ViewerWindow : Window
         bar.Children.Add(new TextBlock { Text = "螢幕", Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
         bar.Children.Add(_monitors);
         bar.Children.Add(_sendFile);
+        bar.Children.Add(_remoteFiles);
         bar.Children.Add(_stats);
         _sendFile.Click += (_, _) => OnSendFile();
+        _remoteFiles.Click += (_, _) => { if (_client is { } c) new RemoteBrowserWindow(c) { Owner = this }.Show(); };
 
         // 每秒更新一次 FPS 與解析度（傳檔中不覆蓋進度文字）
         var fpsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -126,6 +152,21 @@ internal sealed class ViewerWindow : Window
         _screen.MouseDown += (_, _) => _screen.Focus();
         KeyDown += (_, e) => OnKey(e, true);
         KeyUp += (_, e) => OnKey(e, false);
+
+        // 拖放傳檔：把檔案拖進視窗就送到被控端
+        AllowDrop = true;
+        DragOver += (_, e) =>
+        {
+            e.Effects = _client is not null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        };
+        Drop += async (_, e) =>
+        {
+            var c = _client;
+            if (c is null || !e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            foreach (var f in (string[])e.Data.GetData(DataFormats.FileDrop))
+                if (System.IO.File.Exists(f)) await SendFileWithUiAsync(c, f);
+        };
 
         Closed += (_, _) => _cts?.Cancel();
     }
@@ -356,4 +397,86 @@ internal sealed class ViewerWindow : Window
 
     [DllImport("user32.dll")]
     private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+}
+
+/// <summary>遠端檔案瀏覽視窗：列出被控端的磁碟／資料夾，雙擊資料夾進入、雙擊檔案下載到本機。</summary>
+internal sealed class RemoteBrowserWindow : Window
+{
+    private readonly ViewerClient _client;
+    private readonly TextBox _path = new() { Width = 360, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly ListBox _list = new() { Background = new SolidColorBrush(Color.FromRgb(0x2b, 0x2b, 0x2b)) };
+    private readonly TextBlock _status = new() { Foreground = Brushes.Gray, Margin = new Thickness(8, 4, 8, 4) };
+    private readonly List<RemoteEntry> _entries = [];
+    private string _currentPath = "";
+
+    public RemoteBrowserWindow(ViewerClient client)
+    {
+        _client = client;
+        Title = "遠端檔案（雙擊資料夾進入、雙擊檔案下載）";
+        Width = 560; Height = 600;
+        Background = new SolidColorBrush(Color.FromRgb(0x23, 0x23, 0x23));
+
+        var up = new Button { Content = "上層", Width = 56, Margin = new Thickness(0, 0, 6, 0) };
+        var go = new Button { Content = "前往", Width = 56, Margin = new Thickness(6, 0, 0, 0) };
+        up.Click += (_, _) => GoUp();
+        go.Click += (_, _) => Navigate(_path.Text.Trim());
+        var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8) };
+        bar.Children.Add(up);
+        bar.Children.Add(_path);
+        bar.Children.Add(go);
+
+        _list.MouseDoubleClick += (_, _) => OnActivate();
+
+        var root = new DockPanel();
+        DockPanel.SetDock(bar, Dock.Top);
+        DockPanel.SetDock(_status, Dock.Bottom);
+        root.Children.Add(bar);
+        root.Children.Add(_status);
+        root.Children.Add(_list);
+        Content = root;
+
+        _client.RemoteFilesReceived += OnList;
+        _client.FileReceived += OnFileReceived;
+        Loaded += (_, _) => Navigate("");
+        Closed += (_, _) => { _client.RemoteFilesReceived -= OnList; _client.FileReceived -= OnFileReceived; };
+    }
+
+    private void Navigate(string path) { _status.Text = "讀取中…"; _ = _client.RequestRemoteListAsync(path); }
+
+    private void GoUp()
+    {
+        if (string.IsNullOrEmpty(_currentPath)) return;
+        var parent = System.IO.Path.GetDirectoryName(_currentPath.TrimEnd('\\'));
+        Navigate(string.IsNullOrEmpty(parent) ? "" : parent);
+    }
+
+    private void OnList(string path, IReadOnlyList<RemoteEntry> entries) => Dispatcher.Invoke(() =>
+    {
+        _currentPath = path;
+        _path.Text = path;
+        _entries.Clear(); _entries.AddRange(entries);
+        _list.Items.Clear();
+        foreach (var e in entries)
+            _list.Items.Add(new ListBoxItem
+            {
+                Content = (e.IsDirectory ? "📁 " : "📄 ") + e.Name + (e.IsDirectory ? "" : $"   ({Human(e.Size)})"),
+                Foreground = Brushes.White,
+            });
+        _status.Text = $"{entries.Count} 個項目";
+    });
+
+    private void OnActivate()
+    {
+        int i = _list.SelectedIndex;
+        if (i < 0 || i >= _entries.Count) return;
+        var e = _entries[i];
+        string full = string.IsNullOrEmpty(_currentPath) ? e.Name : System.IO.Path.Combine(_currentPath, e.Name);
+        if (e.IsDirectory) Navigate(full);
+        else { _status.Text = "下載中：" + e.Name; _ = _client.RequestRemotePullAsync(full); }
+    }
+
+    private void OnFileReceived(string savedPath) => Dispatcher.Invoke(() => _status.Text = "已下載到：" + savedPath);
+
+    private static string Human(long n) =>
+        n >= 1 << 20 ? $"{n / (1 << 20)} MB" : n >= 1 << 10 ? $"{n / (1 << 10)} KB" : $"{n} B";
 }

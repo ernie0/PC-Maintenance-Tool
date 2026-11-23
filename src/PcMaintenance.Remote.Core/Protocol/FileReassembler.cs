@@ -1,15 +1,13 @@
 using System.Security.Cryptography;
-using PcMaintenance.Remote.Core.Protocol;
 
-namespace PcMaintenance.Remote.Agent.Files;
+namespace PcMaintenance.Remote.Core.Protocol;
 
 /// <summary>
-/// 被控端收檔：把控制端送來的 <see cref="FrameType.FileChunk"/> 片段依傳輸編號重組寫檔，
-/// 用 End 的 SHA-256 核對完整性後，移到收檔資料夾（預設 exe 旁的「收到的檔案」，可用
-/// 環境變數 PCM_REMOTE_DOWNLOADS 覆寫）。檔名會淨化避免路徑穿越、同名自動加序號。
+/// 把對方送來的 <see cref="FrameType.FileChunk"/> 片段依傳輸編號重組寫檔，用 End 的 SHA-256
+/// 核對完整性後移到收檔資料夾。檔名會淨化避免路徑穿越、同名自動加序號。兩端收檔共用。
 /// 由接收迴圈單一執行緒呼叫。
 /// </summary>
-public sealed class FileReceiver : IDisposable
+public sealed class FileReassembler : IDisposable
 {
     private readonly string _dir;
     private readonly Dictionary<Guid, Incoming> _active = [];
@@ -24,11 +22,9 @@ public sealed class FileReceiver : IDisposable
         public required string TempPath;
     }
 
-    public FileReceiver(string? dir = null)
+    public FileReassembler(string directory)
     {
-        _dir = dir
-            ?? Environment.GetEnvironmentVariable("PCM_REMOTE_DOWNLOADS")
-            ?? Path.Combine(AppContext.BaseDirectory, "收到的檔案");
+        _dir = directory;
         Directory.CreateDirectory(_dir);
     }
 
@@ -52,7 +48,8 @@ public sealed class FileReceiver : IDisposable
     private void Begin(Guid id, string name)
     {
         string safe = SafeName(name);
-        string temp = Path.Combine(_dir, $"{safe}.{id:N}.part"[..Math.Min($"{safe}.{id:N}.part".Length, 180)]);
+        string stem = $"{safe}.{id:N}.part";
+        string temp = Path.Combine(_dir, stem[..Math.Min(stem.Length, 180)]);
         try
         {
             var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None);

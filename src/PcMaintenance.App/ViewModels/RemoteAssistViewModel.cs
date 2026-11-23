@@ -46,6 +46,7 @@ public sealed partial class RemoteAssistViewModel : PageViewModel
     public event Action? ClientDisconnected;
 
     private CancellationTokenSource? _cts;
+    private bool _suppressMonitorSwitch; // 程式填入螢幕清單時，別讓自動選取觸發切換（否則被控端會無限重建擷取、畫面出不來）
 
     [RelayCommand]
     private async Task RefreshAgentsAsync()
@@ -105,9 +106,14 @@ public sealed partial class RemoteAssistViewModel : PageViewModel
             client.VerificationCodeReady += code => { gotCode = true; Ui(() => VerificationCode = code); };
             client.MonitorListReceived += list => Ui(() =>
             {
-                Monitors.Clear();
-                foreach (var m in list) Monitors.Add(m);
-                if (Monitors.Count > 0 && SelectedMonitor is null) SelectedMonitor = Monitors[0];
+                _suppressMonitorSwitch = true;
+                try
+                {
+                    Monitors.Clear();
+                    foreach (var m in list) Monitors.Add(m);
+                    if (Monitors.Count > 0 && SelectedMonitor is null) SelectedMonitor = Monitors[0];
+                }
+                finally { _suppressMonitorSwitch = false; }
             });
             Client = client;
             Ui(() =>
@@ -140,6 +146,7 @@ public sealed partial class RemoteAssistViewModel : PageViewModel
 
     partial void OnSelectedMonitorChanged(MonitorDescriptor? value)
     {
+        if (_suppressMonitorSwitch) return; // 程式填清單時的自動選取不送切換
         if (value is not null && Client is not null) _ = Client.SwitchMonitorAsync(value.Index);
     }
 

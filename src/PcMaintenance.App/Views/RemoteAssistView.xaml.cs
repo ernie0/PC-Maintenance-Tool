@@ -55,11 +55,20 @@ public partial class RemoteAssistView : UserControl
     private void OnConnected()
     {
         _client = _vm?.Client;
+        Dbg($"OnConnected client={(_client is not null)}");
         if (_client is not null)
         {
             _client.FrameRendered += OnFrame;
             _client.ClipboardReceived += OnClipboardReceived;
         }
+    }
+
+    private int _dbgFrames;
+    private static void Dbg(string m)
+    {
+        var p = Environment.GetEnvironmentVariable("PCM_VIEW_DEBUG");
+        if (p is null) return;
+        try { System.IO.File.AppendAllText(p, $"{DateTime.Now:HH:mm:ss.fff} {m}{Environment.NewLine}"); } catch { }
     }
 
     private void OnDisconnected()
@@ -111,15 +120,19 @@ public partial class RemoteAssistView : UserControl
         try { Clipboard.SetText(text); } catch { }
     }
 
-    private void OnFrame(RenderedFrame f) => Dispatcher.BeginInvoke(() =>
+    private void OnFrame(RenderedFrame f)
     {
-        if (_bitmap is null || _bitmap.PixelWidth != f.Width || _bitmap.PixelHeight != f.Height)
+        if (_dbgFrames++ == 0) Dbg($"first frame {f.Width}x{f.Height}");
+        Dispatcher.BeginInvoke(() =>
         {
-            _bitmap = new WriteableBitmap(f.Width, f.Height, 96, 96, PixelFormats.Bgra32, null);
-            Screen.Source = _bitmap;
-        }
-        _bitmap.WritePixels(new Int32Rect(0, 0, f.Width, f.Height), f.Bgra, f.Width * 4, 0);
-    }, DispatcherPriority.Render);
+            if (_bitmap is null || _bitmap.PixelWidth != f.Width || _bitmap.PixelHeight != f.Height)
+            {
+                _bitmap = new WriteableBitmap(f.Width, f.Height, 96, 96, PixelFormats.Bgra32, null);
+                Screen.Source = _bitmap;
+            }
+            _bitmap.WritePixels(new Int32Rect(0, 0, f.Width, f.Height), f.Bgra, f.Width * 4, 0);
+        }, DispatcherPriority.Render);
+    }
 
     // ---- 本機輸入 → 遠端桌面的 0..65535 比例值 ----
 

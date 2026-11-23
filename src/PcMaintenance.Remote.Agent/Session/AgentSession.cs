@@ -27,7 +27,9 @@ public sealed class AgentSession : IAsyncDisposable
     private readonly AgentSessionOptions _opts;
     private readonly InputInjector _injector = new();
     private readonly ClipboardBridge _clipboard = new();
-    private readonly FileReceiver _fileReceiver = new();
+    private readonly FileReassembler _fileReceiver = new(
+        Environment.GetEnvironmentVariable("PCM_REMOTE_DOWNLOADS")
+        ?? System.IO.Path.Combine(AppContext.BaseDirectory, "收到的檔案"));
     private readonly Channel<(FrameType Type, byte[] Payload)> _outgoing =
         Channel.CreateBounded<(FrameType, byte[])>(new BoundedChannelOptions(32)
         {
@@ -39,6 +41,7 @@ public sealed class AgentSession : IAsyncDisposable
     private H264Encoder? _encoder;
     private volatile int _switchRequest = -1;
     private long _inputsReceived;
+    private CancellationToken _ct;
 
     // 診斷用：設環境變數 PCM_REMOTE_DEBUG=<檔路徑> 才會寫；正式版不設即完全無作用。
     private static readonly string? DebugLog = Environment.GetEnvironmentVariable("PCM_REMOTE_DEBUG");
@@ -63,6 +66,7 @@ public sealed class AgentSession : IAsyncDisposable
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = linked.Token;
+        _ct = token;
 
         // 螢幕清單先送一次
         EnqueueMonitorList();
@@ -140,9 +144,36 @@ public sealed class AgentSession : IAsyncDisposable
                 case FrameType.FileChunk:
                     _fileReceiver.Handle(payload);
                     break;
+                case FrameType.RemoteFiles:
+                    _ = HandleRemoteFilesAsync(payload);
+                    break;
             }
         }
         catch (Exception ex) { Dbg("dispatch ex (已略過該事件): " + ex.Message); }
+    }
+
+    // 遠端檔案瀏覽／拉檔：清單與檔案都直接走 link 送回（避開會丟影格的影像佇列，確保可靠）。
+    private async Task HandleRemoteFilesAsync(byte[] payload)
+    {
+        try
+        {
+            switch (RemoteFilesProtocol.PeekKind(payload))
+            {
+                case RemoteFilesKind.ListRequest:
+                    if (RemoteFilesProtocol.TryDecodeListRequest(payload, out var listPath))
+                    {
+                        var entries = RemoteFileService.List(listPath);
+                        await _link.SendAsync(FrameType.RemoteFiles,
+                            RemoteFilesProtocol.EncodeListResponse(listPath, entries), _ct).ConfigureAwait(false);
+                    }
+                    break;
+                case RemoteFilesKind.PullRequest:
+                    if (RemoteFilesProtocol.TryDecodePullRequest(payload, out var filePath) && File.Exists(filePath))
+                        await FileSender.SendAsync(_link, filePath, null, _ct).ConfigureAwait(false);
+                    break;
+            }
+        }
+        catch (Exception ex) { Dbg("remotefiles ex: " + ex.Message); }
     }
 
     // ---- 擷取與編碼（獨立執行緒）----

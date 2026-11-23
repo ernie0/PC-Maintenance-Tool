@@ -29,4 +29,7 @@ public enum FrameType : byte
 
     /// <summary>文字對話。P3。</summary>
     Chat = 8,
+
+    /// <summary>遠端檔案瀏覽：清單要求／清單回應／拉檔要求（配合 <see cref="FileChunk"/> 回傳）。</summary>
+    RemoteFiles = 10,
 }

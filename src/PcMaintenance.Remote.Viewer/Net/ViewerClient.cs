@@ -19,17 +19,26 @@ public sealed record RenderedFrame(byte[] Bgra, int Width, int Height);
 public sealed class ViewerClient : IDisposable
 {
     private readonly H264Decoder _decoder = new();
+    private readonly FileReassembler _incoming = new(
+        Environment.GetEnvironmentVariable("PCM_VIEWER_DOWNLOADS")
+        ?? Path.Combine(AppContext.BaseDirectory, "下載"));
     private ISecureLink? _link;
     private int _latestMove = -1; // 合流用：打包的 (nx<<16 | ny)，-1 代表沒有待送的滑鼠移動
     private int _displayW, _displayH;
     private IReadOnlyList<MonitorDescriptor> _monitors = [];
     private int _currentMonitor;
 
+    public ViewerClient() => _incoming.FileSaved += p => FileReceived?.Invoke(p);
+
     public event Action<string>? VerificationCodeReady;
     public event Action<IReadOnlyList<MonitorDescriptor>>? MonitorListReceived;
     public event Action<RenderedFrame>? FrameRendered;
     /// <summary>收到被控端送來的剪貼簿文字。</summary>
     public event Action<string>? ClipboardReceived;
+    /// <summary>收到被控端傳來的檔案並通過核對，參數為本機存檔路徑。</summary>
+    public event Action<string>? FileReceived;
+    /// <summary>收到遠端資料夾清單：(路徑, 項目清單)。</summary>
+    public event Action<string, IReadOnlyList<RemoteEntry>>? RemoteFilesReceived;
     /// <summary>經伺服器連線獲被控端同意時觸發：(是否隱藏進行, 本次是否完成配對)。</summary>
     public event Action<bool, bool>? SessionGranted;
 
@@ -161,6 +170,13 @@ public sealed class ViewerClient : IDisposable
             case FrameType.Clipboard:
                 ClipboardReceived?.Invoke(System.Text.Encoding.UTF8.GetString(payload));
                 break;
+            case FrameType.FileChunk:
+                _incoming.Handle(payload);
+                break;
+            case FrameType.RemoteFiles:
+                if (RemoteFilesProtocol.TryDecodeListResponse(payload, out var rpath, out var rentries))
+                    RemoteFilesReceived?.Invoke(rpath, rentries);
+                break;
         }
     }
 
@@ -169,29 +185,16 @@ public sealed class ViewerClient : IDisposable
         _link?.SendAsync(FrameType.Clipboard, System.Text.Encoding.UTF8.GetBytes(text), ct) ?? Task.CompletedTask;
 
     /// <summary>把一個檔案傳到被控端（分塊送、附 SHA-256 讓對方核對）。progress 回報 0..1。</summary>
-    public async Task SendFileAsync(string path, IProgress<double>? progress = null, CancellationToken ct = default)
-    {
-        var link = _link;
-        if (link is null) return;
+    public Task SendFileAsync(string path, IProgress<double>? progress = null, CancellationToken ct = default) =>
+        _link is { } link ? FileSender.SendAsync(link, path, progress, ct) : Task.CompletedTask;
 
-        var id = Guid.NewGuid();
-        long size = new FileInfo(path).Length;
-        await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeBegin(id, size, Path.GetFileName(path)), ct).ConfigureAwait(false);
+    /// <summary>向被控端要一個資料夾清單（空字串＝磁碟根目錄清單）。回應由 <see cref="RemoteFilesReceived"/> 送出。</summary>
+    public Task RequestRemoteListAsync(string path, CancellationToken ct = default) =>
+        _link?.SendAsync(FrameType.RemoteFiles, RemoteFilesProtocol.EncodeListRequest(path), ct) ?? Task.CompletedTask;
 
-        using var sha = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
-        using var fs = File.OpenRead(path);
-        byte[] buf = new byte[FileTransferProtocol.ChunkSize];
-        long offset = 0;
-        int read;
-        while ((read = await fs.ReadAsync(buf.AsMemory(0, buf.Length), ct).ConfigureAwait(false)) > 0)
-        {
-            sha.AppendData(buf, 0, read);
-            await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeChunk(id, offset, buf.AsSpan(0, read)), ct).ConfigureAwait(false);
-            offset += read;
-            progress?.Report(size > 0 ? (double)offset / size : 1);
-        }
-        await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeEnd(id, sha.GetHashAndReset()), ct).ConfigureAwait(false);
-    }
+    /// <summary>向被控端要一個檔案（被控端會把該檔分塊送回，由 FileReassembler 收到本機）。</summary>
+    public Task RequestRemotePullAsync(string filePath, CancellationToken ct = default) =>
+        _link?.SendAsync(FrameType.RemoteFiles, RemoteFilesProtocol.EncodePullRequest(filePath), ct) ?? Task.CompletedTask;
 
     private void OnNv12(DecodedNv12 f)
     {
@@ -226,7 +229,7 @@ public sealed class ViewerClient : IDisposable
         return _link?.SendAsync(FrameType.MonitorSwitch, MonitorProtocol.EncodeSwitch(index), ct) ?? Task.CompletedTask;
     }
 
-    public void Dispose() => _decoder.Dispose();
+    public void Dispose() { _decoder.Dispose(); _incoming.Dispose(); }
 }
 
 /// <summary>被控端拒絕連線、不在線上或未回應。</summary>
