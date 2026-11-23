@@ -13,6 +13,12 @@ public sealed class InputInjector
 {
     private int _monLeft, _monTop, _monWidth = 1, _monHeight = 1;
 
+    // 記住目前按著的鍵與滑鼠鍵，連線結束時一併放開，避免控制端放開前就斷線造成遠端卡住
+    // （例如按著 Ctrl 或左鍵時斷線）。由接收迴圈單一執行緒更新；ReleaseAll 在收尾時呼叫，兩者不同步，加鎖保險。
+    private readonly object _heldLock = new();
+    private readonly HashSet<(ushort Scan, bool Extended)> _heldKeys = [];
+    private readonly HashSet<Core.Protocol.MouseButton> _heldButtons = [];
+
     /// <summary>切換螢幕時更新目前擷取螢幕在虛擬桌面的像素範圍。</summary>
     public void SetMonitorBounds(int left, int top, int width, int height)
     {
@@ -29,6 +35,24 @@ public sealed class InputInjector
             case InputKind.MouseWheel: MouseWheel(ev.WheelDelta, ev.WheelHorizontal); break;
             case InputKind.Key: Key(ev.ScanCode, ev.IsDown, ev.Extended); break;
         }
+    }
+
+    /// <summary>連線結束時呼叫：放開所有還按著的鍵與滑鼠鍵，避免遠端卡住。</summary>
+    public void ReleaseAll()
+    {
+        (ushort, bool)[] keys;
+        Core.Protocol.MouseButton[] buttons;
+        lock (_heldLock)
+        {
+            keys = [.. _heldKeys];
+            buttons = [.. _heldButtons];
+            _heldKeys.Clear();
+            _heldButtons.Clear();
+        }
+        foreach (var (scan, extended) in keys)
+            try { Key(scan, down: false, extended, track: false); } catch { }
+        foreach (var b in buttons)
+            try { MouseButton(b, down: false, track: false); } catch { }
     }
 
     private void MouseMove(ushort normX, ushort normY)
@@ -48,8 +72,10 @@ public sealed class InputInjector
         SendMouse(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK, absX, absY, 0);
     }
 
-    private void MouseButton(Core.Protocol.MouseButton button, bool down)
+    private void MouseButton(Core.Protocol.MouseButton button, bool down, bool track = true)
     {
+        if (track)
+            lock (_heldLock) { if (down) _heldButtons.Add(button); else _heldButtons.Remove(button); }
         uint flags = button switch
         {
             Core.Protocol.MouseButton.Left => down ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP,
@@ -65,8 +91,10 @@ public sealed class InputInjector
     private void MouseWheel(short delta, bool horizontal) =>
         SendMouse(horizontal ? MOUSEEVENTF_HWHEEL : MOUSEEVENTF_WHEEL, 0, 0, unchecked((uint)delta));
 
-    private void Key(ushort scanCode, bool down, bool extended)
+    private void Key(ushort scanCode, bool down, bool extended, bool track = true)
     {
+        if (track)
+            lock (_heldLock) { if (down) _heldKeys.Add((scanCode, extended)); else _heldKeys.Remove((scanCode, extended)); }
         uint flags = KEYEVENTF_SCANCODE;
         if (!down) flags |= KEYEVENTF_KEYUP;
         if (extended) flags |= KEYEVENTF_EXTENDEDKEY;

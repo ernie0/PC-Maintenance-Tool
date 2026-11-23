@@ -180,7 +180,7 @@ internal sealed class ViewerWindow : Window
     {
         if (_client is null) return;
         if (TryNormalize(e.GetPosition(_screen), out var nx, out var ny))
-            _ = _client.SendInputAsync(InputEvent.Move(nx, ny));
+            _client.QueueMouseMove(nx, ny); // 合流：只保留最新位置、定頻送出
     }
 
     private void OnButton(MouseButtonEventArgs e, CoreMouseButton button, bool down)

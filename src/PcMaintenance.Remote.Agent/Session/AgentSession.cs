@@ -34,6 +34,7 @@ public sealed class AgentSession : IAsyncDisposable
     private DesktopDuplicator? _capturer;
     private H264Encoder? _encoder;
     private volatile int _switchRequest = -1;
+    private long _inputsReceived;
 
     // 診斷用：設環境變數 PCM_REMOTE_DEBUG=<檔路徑> 才會寫；正式版不設即完全無作用。
     private static readonly string? DebugLog = Environment.GetEnvironmentVariable("PCM_REMOTE_DEBUG");
@@ -77,6 +78,10 @@ public sealed class AgentSession : IAsyncDisposable
         await Task.WhenAll(
             sendPump.ContinueWith(_ => { }, TaskScheduler.Default),
             receiveLoop.ContinueWith(_ => { }, TaskScheduler.Default)).ConfigureAwait(false);
+
+        Dbg($"session end: inputs received = {_inputsReceived}");
+        // 收尾：放開連線期間還按著的鍵與滑鼠鍵，避免遠端卡住（例如按著 Ctrl 時斷線）。
+        try { _injector.ReleaseAll(); } catch { }
     }
 
     private async Task SendPumpAsync(ISecureLink link, CancellationToken ct)
@@ -108,15 +113,20 @@ public sealed class AgentSession : IAsyncDisposable
 
     private void Dispatch(FrameType type, byte[] payload)
     {
-        switch (type)
+        // 單一事件處理失敗（例如某次 SendInput 失敗）只略過這一筆，不讓整條連線斷掉。
+        try
         {
-            case FrameType.Input:
-                if (InputEvent.TryDecode(payload, out var ev)) _injector.Inject(ev);
-                break;
-            case FrameType.MonitorSwitch:
-                if (MonitorProtocol.TryDecodeSwitch(payload, out int idx)) _switchRequest = idx;
-                break;
+            switch (type)
+            {
+                case FrameType.Input:
+                    if (InputEvent.TryDecode(payload, out var ev)) { _injector.Inject(ev); _inputsReceived++; }
+                    break;
+                case FrameType.MonitorSwitch:
+                    if (MonitorProtocol.TryDecodeSwitch(payload, out int idx)) _switchRequest = idx;
+                    break;
+            }
         }
+        catch (Exception ex) { Dbg("dispatch ex (已略過該事件): " + ex.Message); }
     }
 
     // ---- 擷取與編碼（獨立執行緒）----

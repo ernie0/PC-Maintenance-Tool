@@ -20,6 +20,7 @@ public sealed class ViewerClient : IDisposable
 {
     private readonly H264Decoder _decoder = new();
     private ISecureLink? _link;
+    private int _latestMove = -1; // 合流用：打包的 (nx<<16 | ny)，-1 代表沒有待送的滑鼠移動
     private int _displayW, _displayH;
     private IReadOnlyList<MonitorDescriptor> _monitors = [];
     private int _currentMonitor;
@@ -45,14 +46,46 @@ public sealed class ViewerClient : IDisposable
     public async Task RunWithLinkAsync(ISecureLink link, CancellationToken ct)
     {
         _link = link;
+        Volatile.Write(ref _latestMove, -1);
         VerificationCodeReady?.Invoke(link.VerificationCode);
 
-        while (!ct.IsCancellationRequested)
+        using var pumpCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var movePump = MovePumpAsync(pumpCts.Token);
+        try
         {
-            var msg = await link.ReceiveAsync(ct).ConfigureAwait(false);
-            if (msg is null) break;
-            Handle(msg.Value.Type, msg.Value.Payload);
+            while (!ct.IsCancellationRequested)
+            {
+                var msg = await link.ReceiveAsync(ct).ConfigureAwait(false);
+                if (msg is null) break;
+                Handle(msg.Value.Type, msg.Value.Payload);
+            }
         }
+        finally
+        {
+            pumpCts.Cancel();
+            try { await movePump.ConfigureAwait(false); } catch { /* 收尾 */ }
+        }
+    }
+
+    /// <summary>以固定頻率（約 125Hz 上限）只送出最新的滑鼠位置，避免連續移動產生洪水般的事件、累積延遲又浪費頻寬。</summary>
+    private async Task MovePumpAsync(CancellationToken ct)
+    {
+        int lastSent = -1;
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(8, ct).ConfigureAwait(false);
+                int cur = Volatile.Read(ref _latestMove);
+                if (cur < 0 || cur == lastSent) continue;
+                lastSent = cur;
+                var link = _link;
+                if (link is null) continue;
+                var ev = InputEvent.Move((ushort)(cur >> 16), (ushort)(cur & 0xFFFF));
+                try { await link.SendAsync(FrameType.Input, ev.Encode(), ct).ConfigureAwait(false); } catch { }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     /// <summary>查伺服器目前線上的被控端清單（給連線畫面挑選）。</summary>
@@ -144,6 +177,13 @@ public sealed class ViewerClient : IDisposable
 
     public Task SendInputAsync(InputEvent ev, CancellationToken ct = default) =>
         _link?.SendAsync(FrameType.Input, ev.Encode(), ct) ?? Task.CompletedTask;
+
+    /// <summary>
+    /// 排入一次滑鼠移動（相對目前螢幕的 0..65535 比例值）。只保留最新位置，由內部定頻送出，
+    /// 讓 UI 的高頻 MouseMove 不會塞爆連線。按鍵、點擊、滾輪仍走 <see cref="SendInputAsync"/> 即時送。
+    /// </summary>
+    public void QueueMouseMove(ushort normX, ushort normY) =>
+        Volatile.Write(ref _latestMove, (normX << 16) | normY);
 
     public Task SwitchMonitorAsync(int index, CancellationToken ct = default)
     {
