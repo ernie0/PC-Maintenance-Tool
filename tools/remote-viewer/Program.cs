@@ -49,6 +49,10 @@ internal sealed class ViewerWindow : Window
         if (cmdArgs.Length >= 1) _host.Text = cmdArgs[0];
         if (cmdArgs.Length >= 2) _port.Text = cmdArgs[1];
 
+        // 測試用：帶 --auto 時載入後自動按「連線」，方便本機重現問題。
+        if (Array.IndexOf(cmdArgs, "--auto") >= 0)
+            Loaded += async (_, _) => { await Task.Delay(500); ToggleConnect(); };
+
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8) };
         bar.Children.Add(new TextBlock { Text = "位址", Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
         bar.Children.Add(_host);
@@ -88,6 +92,7 @@ internal sealed class ViewerWindow : Window
         if (_client is not null) { _cts?.Cancel(); return; }
 
         if (!int.TryParse(_port.Text, out int port)) { _code.Text = "port 格式錯誤"; return; }
+        string host = _host.Text.Trim();   // 必須在 UI 執行緒讀 TextBox，不能在下面的 Task.Run 裡讀
         var client = new ViewerClient();
         var cts = new CancellationTokenSource();
         _client = client; _cts = cts;
@@ -105,9 +110,13 @@ internal sealed class ViewerWindow : Window
 
         _ = Task.Run(async () =>
         {
-            try { await client.RunAsync(_host.Text, port, cts.Token); }
+            try { await client.RunAsync(host, port, cts.Token); }
             catch (OperationCanceledException) { }
-            catch (Exception ex) { Dispatch(() => { _code.Foreground = Brushes.IndianRed; _code.Text = "連線失敗：" + ex.Message; }); }
+            catch (Exception ex)
+            {
+                try { System.IO.File.WriteAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "viewer-error.txt"), ex.ToString()); } catch { }
+                Dispatch(() => { _code.Foreground = Brushes.IndianRed; _code.Text = "連線失敗：" + ex.Message; });
+            }
             finally { Dispatch(ResetConnectionUi); }
         });
     }
