@@ -28,6 +28,8 @@ public sealed class ViewerClient : IDisposable
     public event Action<string>? VerificationCodeReady;
     public event Action<IReadOnlyList<MonitorDescriptor>>? MonitorListReceived;
     public event Action<RenderedFrame>? FrameRendered;
+    /// <summary>收到被控端送來的剪貼簿文字。</summary>
+    public event Action<string>? ClipboardReceived;
     /// <summary>經伺服器連線獲被控端同意時觸發：(是否隱藏進行, 本次是否完成配對)。</summary>
     public event Action<bool, bool>? SessionGranted;
 
@@ -156,8 +158,15 @@ public sealed class ViewerClient : IDisposable
                 ApplyDisplaySize();
                 MonitorListReceived?.Invoke(_monitors);
                 break;
+            case FrameType.Clipboard:
+                ClipboardReceived?.Invoke(System.Text.Encoding.UTF8.GetString(payload));
+                break;
         }
     }
+
+    /// <summary>把本機剪貼簿文字送到被控端。</summary>
+    public Task SendClipboardAsync(string text, CancellationToken ct = default) =>
+        _link?.SendAsync(FrameType.Clipboard, System.Text.Encoding.UTF8.GetBytes(text), ct) ?? Task.CompletedTask;
 
     private void OnNv12(DecodedNv12 f)
     {

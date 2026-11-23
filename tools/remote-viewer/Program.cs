@@ -33,13 +33,16 @@ internal sealed class ViewerWindow : Window
     private readonly Button _connect = new() { Content = "連線", Width = 64, Margin = new Thickness(4, 0, 12, 0) };
     private readonly TextBlock _code = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), FontWeight = FontWeights.Bold };
     private readonly ComboBox _monitors = new() { Width = 200, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _stats = new() { Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
     private readonly Image _screen = new() { Stretch = Stretch.Uniform, Focusable = true, SnapsToDevicePixels = true };
+    private int _fpsFrames;
 
     private ViewerClient? _client;
     private CancellationTokenSource? _cts;
     private WriteableBitmap? _bitmap;
     private bool _switchingList;
     private string? _snapPath; private int _snapAfter = 60, _frameCount; private bool _snapped;
+    private string? _clipLastSeen;
 
     public ViewerWindow(string[] cmdArgs)
     {
@@ -72,6 +75,21 @@ internal sealed class ViewerWindow : Window
         bar.Children.Add(_code);
         bar.Children.Add(new TextBlock { Text = "螢幕", Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
         bar.Children.Add(_monitors);
+        bar.Children.Add(_stats);
+
+        // 每秒更新一次 FPS 與解析度
+        var fpsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        fpsTimer.Tick += (_, _) =>
+        {
+            int fps = _fpsFrames; _fpsFrames = 0;
+            _stats.Text = _client is null ? "" : $"FPS {fps}" + (_bitmap is not null ? $" · {_bitmap.PixelWidth}×{_bitmap.PixelHeight}" : "");
+        };
+        fpsTimer.Start();
+
+        // 剪貼簿雙向同步：輪詢本機剪貼簿有變更就送到被控端
+        var clipTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        clipTimer.Tick += (_, _) => PollLocalClipboard();
+        clipTimer.Start();
 
         var root = new DockPanel();
         DockPanel.SetDock(bar, Dock.Top);
@@ -98,44 +116,93 @@ internal sealed class ViewerWindow : Window
 
     private void ToggleConnect()
     {
-        if (_client is not null) { _cts?.Cancel(); return; }
+        if (_cts is not null) { _cts.Cancel(); return; } // 連線中／重連中 → 使用者要求中斷
 
         if (!int.TryParse(_port.Text, out int port)) { _code.Text = "port 格式錯誤"; return; }
-        string host = _host.Text.Trim();   // 必須在 UI 執行緒讀 TextBox，不能在下面的 Task.Run 裡讀
-        var client = new ViewerClient();
+        string host = _host.Text.Trim();   // 必須在 UI 執行緒讀 TextBox，不能在下面的 Task 裡讀
         var cts = new CancellationTokenSource();
-        _client = client; _cts = cts;
+        _cts = cts;
         _connect.Content = "中斷";
-        _code.Foreground = Brushes.Orange;
-        _code.Text = "連線中…";
+        _ = ConnectLoopAsync(host, port, cts.Token);
+    }
 
-        client.VerificationCodeReady += code => Dispatch(() =>
+    /// <summary>連線並在非使用者主動中斷的斷線時自動重連（約每 2 秒一次）；連成功會重置重試次數。</summary>
+    private async Task ConnectLoopAsync(string host, int port, CancellationToken userCt)
+    {
+        int attempt = 0;
+        const int maxAttempts = 20;
+        while (!userCt.IsCancellationRequested)
         {
-            _code.Foreground = Brushes.LightGreen;
-            _code.Text = code;
-        });
-        client.MonitorListReceived += list => Dispatch(() => PopulateMonitors(list));
-        client.FrameRendered += OnFrame;
+            var client = new ViewerClient();
+            bool gotCode = false;
+            client.VerificationCodeReady += code => { gotCode = true; Dispatch(() => { _code.Foreground = Brushes.LightGreen; _code.Text = code; }); };
+            client.MonitorListReceived += list => Dispatch(() => PopulateMonitors(list));
+            client.FrameRendered += OnFrame;
+            client.ClipboardReceived += text => Dispatch(() => SetLocalClipboard(text));
+            Dispatch(() =>
+            {
+                _client = client;
+                _code.Foreground = Brushes.Orange;
+                _code.Text = attempt == 0 ? "連線中…" : $"重連中…（{attempt}）";
+            });
 
-        _ = Task.Run(async () =>
-        {
-            try { await client.RunAsync(host, port, cts.Token); }
-            catch (OperationCanceledException) { }
+            try { await client.RunAsync(host, port, userCt).ConfigureAwait(false); }
+            catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
                 try { System.IO.File.WriteAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "viewer-error.txt"), ex.ToString()); } catch { }
                 Dispatch(() => { _code.Foreground = Brushes.IndianRed; _code.Text = "連線失敗：" + ex.Message; });
             }
-            finally { Dispatch(ResetConnectionUi); }
-        });
+            finally
+            {
+                client.FrameRendered -= OnFrame;
+                client.Dispose();
+                Dispatch(() => { _client = null; _monitors.Items.Clear(); });
+            }
+
+            if (userCt.IsCancellationRequested) break;
+            attempt = gotCode ? 0 : attempt + 1;          // 連成功過就把重試次數歸零
+            if (attempt >= maxAttempts)
+            {
+                Dispatch(() => { _code.Foreground = Brushes.IndianRed; _code.Text = "多次重連失敗，請重新連線"; });
+                break;
+            }
+            Dispatch(() => { _code.Foreground = Brushes.Orange; _code.Text = $"連線中斷，2 秒後重連…（{attempt}）"; });
+            try { await Task.Delay(2000, userCt).ConfigureAwait(false); } catch { break; }
+        }
+        Dispatch(ResetConnectionUi);
     }
 
     private void ResetConnectionUi()
     {
-        _client?.Dispose();
         _client = null; _cts = null;
         _connect.Content = "連線";
         _monitors.Items.Clear();
+        _stats.Text = "";
+    }
+
+    // ---- 剪貼簿雙向同步 ----
+
+    private void PollLocalClipboard()
+    {
+        var client = _client;
+        if (client is null) return;
+        string? text = SafeGetClipboardText();
+        if (text is null || text == _clipLastSeen) return;
+        _clipLastSeen = text;
+        _ = client.SendClipboardAsync(text);
+    }
+
+    private static string? SafeGetClipboardText()
+    {
+        try { return Clipboard.ContainsText() ? Clipboard.GetText() : null; }
+        catch { return null; }
+    }
+
+    private void SetLocalClipboard(string text)
+    {
+        _clipLastSeen = text; // 避免又被輪詢當成本機變更回送
+        try { Clipboard.SetText(text); } catch { }
     }
 
     private void PopulateMonitors(IReadOnlyList<MonitorDescriptor> list)
@@ -162,6 +229,7 @@ internal sealed class ViewerWindow : Window
             _screen.Source = _bitmap;
         }
         _bitmap.WritePixels(new Int32Rect(0, 0, f.Width, f.Height), f.Bgra, f.Width * 4, 0);
+        _fpsFrames++;
 
         if (_snapPath is not null && !_snapped && ++_frameCount >= _snapAfter)
         {

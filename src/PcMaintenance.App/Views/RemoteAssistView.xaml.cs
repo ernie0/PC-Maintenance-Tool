@@ -22,11 +22,17 @@ public partial class RemoteAssistView : UserControl
     private RemoteAssistViewModel? _vm;
     private ViewerClient? _client;
     private WriteableBitmap? _bitmap;
+    private string? _clipLastSeen;
 
     public RemoteAssistView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        // 剪貼簿雙向同步：輪詢本機剪貼簿有變更就送到被控端
+        var clipTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        clipTimer.Tick += (_, _) => PollLocalClipboard();
+        clipTimer.Start();
 
         Screen.MouseMove += OnMouseMove;
         Screen.MouseLeftButtonDown += (_, e) => OnButton(e, CoreMouseButton.Left, true);
@@ -49,15 +55,49 @@ public partial class RemoteAssistView : UserControl
     private void OnConnected()
     {
         _client = _vm?.Client;
-        if (_client is not null) _client.FrameRendered += OnFrame;
+        if (_client is not null)
+        {
+            _client.FrameRendered += OnFrame;
+            _client.ClipboardReceived += OnClipboardReceived;
+        }
     }
 
     private void OnDisconnected()
     {
-        if (_client is not null) _client.FrameRendered -= OnFrame;
+        if (_client is not null)
+        {
+            _client.FrameRendered -= OnFrame;
+            _client.ClipboardReceived -= OnClipboardReceived;
+        }
         _client = null;
         _bitmap = null;
         Screen.Source = null;
+    }
+
+    // ---- 剪貼簿雙向同步 ----
+
+    private void OnClipboardReceived(string text) => Dispatcher.BeginInvoke(() => SetLocalClipboard(text));
+
+    private void PollLocalClipboard()
+    {
+        var client = _client;
+        if (client is null) return;
+        string? text = SafeGetClipboardText();
+        if (text is null || text == _clipLastSeen) return;
+        _clipLastSeen = text;
+        _ = client.SendClipboardAsync(text);
+    }
+
+    private static string? SafeGetClipboardText()
+    {
+        try { return Clipboard.ContainsText() ? Clipboard.GetText() : null; }
+        catch { return null; }
+    }
+
+    private void SetLocalClipboard(string text)
+    {
+        _clipLastSeen = text; // 避免又被輪詢當成本機變更回送
+        try { Clipboard.SetText(text); } catch { }
     }
 
     private void OnFrame(RenderedFrame f) => Dispatcher.BeginInvoke(() =>

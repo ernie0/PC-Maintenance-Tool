@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using PcMaintenance.Remote.Agent.Capture;
+using PcMaintenance.Remote.Agent.Clipboard;
 using PcMaintenance.Remote.Agent.Encoding;
 using PcMaintenance.Remote.Agent.Input;
 using PcMaintenance.Remote.Core.Protocol;
@@ -24,6 +25,7 @@ public sealed class AgentSession : IAsyncDisposable
     private readonly ISecureLink _link;
     private readonly AgentSessionOptions _opts;
     private readonly InputInjector _injector = new();
+    private readonly ClipboardBridge _clipboard = new();
     private readonly Channel<(FrameType Type, byte[] Payload)> _outgoing =
         Channel.CreateBounded<(FrameType, byte[])>(new BoundedChannelOptions(32)
         {
@@ -62,6 +64,10 @@ public sealed class AgentSession : IAsyncDisposable
 
         // 螢幕清單先送一次
         EnqueueMonitorList();
+
+        // 被控端剪貼簿有新文字就送往控制端
+        _clipboard.TextCopied += text =>
+            _outgoing.Writer.TryWrite((FrameType.Clipboard, System.Text.Encoding.UTF8.GetBytes(text)));
 
         var captureThread = new Thread(() => CaptureLoop(token)) { IsBackground = true, Name = "agent-capture" };
         captureThread.Start();
@@ -123,6 +129,10 @@ public sealed class AgentSession : IAsyncDisposable
                     break;
                 case FrameType.MonitorSwitch:
                     if (MonitorProtocol.TryDecodeSwitch(payload, out int idx)) _switchRequest = idx;
+                    break;
+                case FrameType.Clipboard:
+                    _clipboard.SetText(System.Text.Encoding.UTF8.GetString(payload));
+                    Dbg($"clipboard in: {payload.Length} bytes");
                     break;
             }
         }
@@ -235,6 +245,7 @@ public sealed class AgentSession : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         _outgoing.Writer.TryComplete();
+        _clipboard.Dispose();
         _link.Dispose();
         return ValueTask.CompletedTask;
     }

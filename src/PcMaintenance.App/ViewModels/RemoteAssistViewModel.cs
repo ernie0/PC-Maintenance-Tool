@@ -87,41 +87,55 @@ public sealed partial class RemoteAssistViewModel : PageViewModel
     {
         Disconnect();
         EnsureMediaFoundation();
-
-        _cts = new CancellationTokenSource();
-        var client = new ViewerClient();
-        Client = client;
-        VerificationCode = "";
-        client.VerificationCodeReady += code => Ui(() => VerificationCode = code);
-        client.MonitorListReceived += list => Ui(() =>
-        {
-            Monitors.Clear();
-            foreach (var m in list) Monitors.Add(m);
-            if (Monitors.Count > 0 && SelectedMonitor is null) SelectedMonitor = Monitors[0];
-        });
-
+        var cts = new CancellationTokenSource();
+        _cts = cts;
         IsConnected = true;
-        Status = "連線中…";
-        ClientConnected?.Invoke();
-
-        _ = Task.Run(async () =>
-        {
-            try { await run(client); Ui(() => Status = "連線已結束"); }
-            catch (OperationCanceledException) { Ui(() => Status = "已中斷"); }
-            catch (SessionRejectedException ex) { Ui(() => Status = ex.Message); }
-            catch (Exception ex) { Ui(() => Status = "連線失敗：" + ex.Message); }
-            finally { Ui(Cleanup); }
-        });
+        _ = ReconnectLoopAsync(run, cts.Token);
     }
 
-    private void Cleanup()
+    /// <summary>連線並在非使用者主動中斷的斷線時自動重連（約每 2 秒一次），連成功會把重試次數歸零；被拒則不重連。</summary>
+    private async Task ReconnectLoopAsync(Func<ViewerClient, Task> run, CancellationToken ct)
     {
-        ClientDisconnected?.Invoke();
-        Client?.Dispose();
-        Client = null;
-        IsConnected = false;
-        Monitors.Clear();
-        SelectedMonitor = null;
+        int attempt = 0;
+        const int maxAttempts = 20;
+        while (!ct.IsCancellationRequested)
+        {
+            var client = new ViewerClient();
+            bool gotCode = false;
+            client.VerificationCodeReady += code => { gotCode = true; Ui(() => VerificationCode = code); };
+            client.MonitorListReceived += list => Ui(() =>
+            {
+                Monitors.Clear();
+                foreach (var m in list) Monitors.Add(m);
+                if (Monitors.Count > 0 && SelectedMonitor is null) SelectedMonitor = Monitors[0];
+            });
+            Client = client;
+            Ui(() =>
+            {
+                VerificationCode = "";
+                Status = attempt == 0 ? "連線中…" : $"重連中…（{attempt}）";
+                ClientConnected?.Invoke();
+            });
+
+            try { await run(client).ConfigureAwait(false); }
+            catch (OperationCanceledException) { break; }
+            catch (SessionRejectedException ex) { Ui(() => Status = ex.Message); break; } // 被拒不重連
+            catch (Exception ex) { Ui(() => Status = "連線失敗：" + ex.Message); }
+            finally
+            {
+                Ui(() => ClientDisconnected?.Invoke());
+                client.Dispose();
+                Client = null;
+                Ui(() => { Monitors.Clear(); SelectedMonitor = null; });
+            }
+
+            if (ct.IsCancellationRequested) break;
+            attempt = gotCode ? 0 : attempt + 1;
+            if (attempt >= maxAttempts) { Ui(() => Status = "多次重連失敗，請重新連線"); break; }
+            Ui(() => Status = $"連線中斷，2 秒後重連…（{attempt}）");
+            try { await Task.Delay(2000, ct).ConfigureAwait(false); } catch { break; }
+        }
+        Ui(() => { IsConnected = false; if (ct.IsCancellationRequested) Status = "已中斷"; });
     }
 
     partial void OnSelectedMonitorChanged(MonitorDescriptor? value)
