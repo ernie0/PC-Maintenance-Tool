@@ -49,7 +49,7 @@ internal sealed class ViewerWindow : Window
         if (cmdArgs.Length >= 1) _host.Text = cmdArgs[0];
         if (cmdArgs.Length >= 2) _port.Text = cmdArgs[1];
 
-        // 測試用：帶 --auto 時載入後自動按「連線」，方便本機重現問題。
+        // 測試用：帶 --auto 時載入後自動按「連線」，方便本機重現。
         if (Array.IndexOf(cmdArgs, "--auto") >= 0)
             Loaded += async (_, _) => { await Task.Delay(500); ToggleConnect(); };
 

@@ -14,7 +14,10 @@ public sealed class FramedConnection
     public const int MaxFrameLength = 32 * 1024 * 1024;
 
     private readonly Stream _stream;
-    private readonly byte[] _lengthBuffer = new byte[4];
+    // 讀與寫各一個長度緩衝：連線是全雙工，送執行緒與收執行緒會同時動長度前綴，
+    // 共用一個緩衝會讓送出覆蓋掉接收剛讀進、還沒解析的長度位元組，造成框錯位、解密失敗、斷線。
+    private readonly byte[] _writeLengthBuffer = new byte[4];
+    private readonly byte[] _readLengthBuffer = new byte[4];
 
     public FramedConnection(Stream stream) => _stream = stream ?? throw new ArgumentNullException(nameof(stream));
 
@@ -22,8 +25,8 @@ public sealed class FramedConnection
     {
         if (payload.Length > MaxFrameLength)
             throw new ArgumentException($"框長度 {payload.Length} 超過上限 {MaxFrameLength}", nameof(payload));
-        BinaryPrimitives.WriteUInt32BigEndian(_lengthBuffer, (uint)payload.Length);
-        await _stream.WriteAsync(_lengthBuffer, ct).ConfigureAwait(false);
+        BinaryPrimitives.WriteUInt32BigEndian(_writeLengthBuffer, (uint)payload.Length);
+        await _stream.WriteAsync(_writeLengthBuffer, ct).ConfigureAwait(false);
         await _stream.WriteAsync(payload, ct).ConfigureAwait(false);
         await _stream.FlushAsync(ct).ConfigureAwait(false);
     }
@@ -31,11 +34,11 @@ public sealed class FramedConnection
     /// <summary>讀一個完整的框。對方正常關閉連線時回傳 null。</summary>
     public async Task<byte[]?> ReadFrameAsync(CancellationToken ct = default)
     {
-        int read = await ReadAtMostAsync(_lengthBuffer, ct).ConfigureAwait(false);
+        int read = await ReadAtMostAsync(_readLengthBuffer, ct).ConfigureAwait(false);
         if (read == 0) return null;                 // 乾淨關閉
         if (read < 4) throw new TransportException("讀長度前綴時連線中斷");
 
-        uint length = BinaryPrimitives.ReadUInt32BigEndian(_lengthBuffer);
+        uint length = BinaryPrimitives.ReadUInt32BigEndian(_readLengthBuffer);
         if (length > MaxFrameLength)
             throw new TransportException($"對方宣告的框長度 {length} 超過上限 {MaxFrameLength}");
 

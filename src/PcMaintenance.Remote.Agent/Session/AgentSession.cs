@@ -35,6 +35,14 @@ public sealed class AgentSession : IAsyncDisposable
     private H264Encoder? _encoder;
     private volatile int _switchRequest = -1;
 
+    // 診斷用：設環境變數 PCM_REMOTE_DEBUG=<檔路徑> 才會寫；正式版不設即完全無作用。
+    private static readonly string? DebugLog = Environment.GetEnvironmentVariable("PCM_REMOTE_DEBUG");
+    private static void Dbg(string m)
+    {
+        if (DebugLog is null) return;
+        try { System.IO.File.AppendAllText(DebugLog, $"{DateTime.Now:HH:mm:ss.fff} {m}{System.Environment.NewLine}"); } catch { }
+    }
+
     public AgentSession(ISecureLink link, AgentSessionOptions? options = null)
     {
         _link = link;
@@ -62,6 +70,7 @@ public sealed class AgentSession : IAsyncDisposable
 
         // 任一邊結束（連線關閉、取消、送出失敗）就收掉整條連線
         await Task.WhenAny(sendPump, receiveLoop).ConfigureAwait(false);
+        Dbg($"WhenAny done: sendPump={sendPump.Status} receiveLoop={receiveLoop.Status}");
         linked.Cancel();
         _outgoing.Writer.TryComplete();
         captureThread.Join(TimeSpan.FromSeconds(3));
@@ -76,9 +85,10 @@ public sealed class AgentSession : IAsyncDisposable
         {
             await foreach (var (type, payload) in _outgoing.Reader.ReadAllAsync(ct).ConfigureAwait(false))
                 await link.SendAsync(type, payload, ct).ConfigureAwait(false);
+            Dbg("sendpump: channel completed");
         }
-        catch (OperationCanceledException) { }
-        catch (Exception) { /* 連線斷了，交由 RunAsync 收尾 */ }
+        catch (OperationCanceledException) { Dbg("sendpump: cancelled"); }
+        catch (Exception ex) { Dbg("sendpump ex: " + ex); /* 連線斷了，交由 RunAsync 收尾 */ }
     }
 
     private async Task ReceiveLoopAsync(ISecureLink link, CancellationToken ct)
@@ -88,12 +98,12 @@ public sealed class AgentSession : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 var msg = await link.ReceiveAsync(ct).ConfigureAwait(false);
-                if (msg is null) break; // 控制端關閉連線
+                if (msg is null) { Dbg("receiveloop: peer closed (null)"); break; } // 控制端關閉連線
                 Dispatch(msg.Value.Type, msg.Value.Payload);
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception) { /* 連線斷了 */ }
+        catch (OperationCanceledException) { Dbg("receiveloop: cancelled"); }
+        catch (Exception ex) { Dbg("receiveloop ex: " + ex); /* 連線斷了 */ }
     }
 
     private void Dispatch(FrameType type, byte[] payload)
@@ -143,21 +153,24 @@ public sealed class AgentSession : IAsyncDisposable
                     _capturer.TryGetNv12(5, nv12, out _);
                     _encoder!.Submit(nv12, frame * frameTicks);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex)
                 {
                     // 編碼器背景執行緒故障（偶發硬體錯誤）→ 就地重建，下一張會是關鍵影格把畫面補回來
+                    Dbg($"captureloop: encoder fault @frame {frame}, rebuild. {ex.Message} | {_encoder?.FaultException}");
                     RebuildEncoder();
                 }
-                catch (SharpGen.Runtime.SharpGenException)
+                catch (SharpGen.Runtime.SharpGenException ex)
                 {
+                    Dbg($"captureloop: capture fault @frame {frame}, rebuild. {ex.Message}");
                     RebuildCapture(_capturer!.Monitor.Index); // 擷取側故障，重建
                     nv12 = new byte[_capturer!.Nv12Size];
                 }
                 frame++;
             }
+            Dbg($"captureloop: exited cleanly @frame {frame}");
         }
-        catch (OperationCanceledException) { }
-        catch (Exception) { /* 擷取執行緒結束，連線會隨之收尾 */ }
+        catch (OperationCanceledException) { Dbg("captureloop: cancelled"); }
+        catch (Exception ex) { Dbg("captureloop ex: " + ex); /* 擷取執行緒結束，連線會隨之收尾 */ }
         finally
         {
             _encoder?.Stop();

@@ -147,4 +147,47 @@ public class TransportTests
 
         await Assert.ThrowsAsync<PcMaintenance.Remote.Core.Crypto.SecureChannelException>(() => init.ReceiveAsync());
     }
+
+    [Fact]
+    public async Task Full_duplex_concurrent_send_and_receive_keeps_frames_intact()
+    {
+        // 回歸測試：連線是全雙工，一端同時送（序列化）與收。送執行緒與收執行緒不可共用
+        // 長度前綴緩衝，否則送出會蓋掉接收剛讀進的長度位元組→框錯位→解密失敗→斷線。
+        // 兩端各送 N 框、同時各收 N 框，全部必須完整且依序到達。
+        var (init, resp) = await ConnectedSessionsAsync();
+        using (init)
+        using (resp)
+        {
+            const int N = 500;
+
+            static async Task SendSeqAsync(SecureSession s)
+            {
+                for (int i = 0; i < N; i++)
+                {
+                    byte[] p = new byte[4];
+                    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(p, i);
+                    await s.SendAsync(FrameType.Input, p);
+                }
+            }
+
+            static async Task<List<int>> RecvSeqAsync(SecureSession s)
+            {
+                var got = new List<int>(N);
+                for (int i = 0; i < N; i++)
+                {
+                    var m = await s.ReceiveAsync();
+                    Assert.NotNull(m);
+                    got.Add(System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(m!.Value.Payload));
+                }
+                return got;
+            }
+
+            var recvAtInit = RecvSeqAsync(init);
+            var recvAtResp = RecvSeqAsync(resp);
+            await Task.WhenAll(SendSeqAsync(init), SendSeqAsync(resp));
+            int[] expected = [.. Enumerable.Range(0, N)];
+            Assert.Equal(expected, await recvAtResp); // init 送的
+            Assert.Equal(expected, await recvAtInit); // resp 送的
+        }
+    }
 }
