@@ -74,6 +74,17 @@ public partial class RemoteAssistView : UserControl
         Screen.Source = null;
     }
 
+    // ---- 傳送檔案到被控端 ----
+
+    private async void OnSendFileClick(object sender, RoutedEventArgs e)
+    {
+        var client = _client;
+        if (client is null) return;
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "選擇要傳到被控端的檔案" };
+        if (dlg.ShowDialog() != true) return;
+        try { await client.SendFileAsync(dlg.FileName); } catch { }
+    }
+
     // ---- 剪貼簿雙向同步 ----
 
     private void OnClipboardReceived(string text) => Dispatcher.BeginInvoke(() => SetLocalClipboard(text));

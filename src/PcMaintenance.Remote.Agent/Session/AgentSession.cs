@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using PcMaintenance.Remote.Agent.Capture;
 using PcMaintenance.Remote.Agent.Clipboard;
 using PcMaintenance.Remote.Agent.Encoding;
+using PcMaintenance.Remote.Agent.Files;
 using PcMaintenance.Remote.Agent.Input;
 using PcMaintenance.Remote.Core.Protocol;
 using PcMaintenance.Remote.Core.Transport;
@@ -26,6 +27,7 @@ public sealed class AgentSession : IAsyncDisposable
     private readonly AgentSessionOptions _opts;
     private readonly InputInjector _injector = new();
     private readonly ClipboardBridge _clipboard = new();
+    private readonly FileReceiver _fileReceiver = new();
     private readonly Channel<(FrameType Type, byte[] Payload)> _outgoing =
         Channel.CreateBounded<(FrameType, byte[])>(new BoundedChannelOptions(32)
         {
@@ -68,6 +70,7 @@ public sealed class AgentSession : IAsyncDisposable
         // 被控端剪貼簿有新文字就送往控制端
         _clipboard.TextCopied += text =>
             _outgoing.Writer.TryWrite((FrameType.Clipboard, System.Text.Encoding.UTF8.GetBytes(text)));
+        _fileReceiver.FileSaved += path => Dbg("file saved: " + path);
 
         var captureThread = new Thread(() => CaptureLoop(token)) { IsBackground = true, Name = "agent-capture" };
         captureThread.Start();
@@ -133,6 +136,9 @@ public sealed class AgentSession : IAsyncDisposable
                 case FrameType.Clipboard:
                     _clipboard.SetText(System.Text.Encoding.UTF8.GetString(payload));
                     Dbg($"clipboard in: {payload.Length} bytes");
+                    break;
+                case FrameType.FileChunk:
+                    _fileReceiver.Handle(payload);
                     break;
             }
         }
@@ -246,6 +252,7 @@ public sealed class AgentSession : IAsyncDisposable
     {
         _outgoing.Writer.TryComplete();
         _clipboard.Dispose();
+        _fileReceiver.Dispose();
         _link.Dispose();
         return ValueTask.CompletedTask;
     }

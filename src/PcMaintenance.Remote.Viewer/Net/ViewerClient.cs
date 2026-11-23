@@ -168,6 +168,31 @@ public sealed class ViewerClient : IDisposable
     public Task SendClipboardAsync(string text, CancellationToken ct = default) =>
         _link?.SendAsync(FrameType.Clipboard, System.Text.Encoding.UTF8.GetBytes(text), ct) ?? Task.CompletedTask;
 
+    /// <summary>把一個檔案傳到被控端（分塊送、附 SHA-256 讓對方核對）。progress 回報 0..1。</summary>
+    public async Task SendFileAsync(string path, IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        var link = _link;
+        if (link is null) return;
+
+        var id = Guid.NewGuid();
+        long size = new FileInfo(path).Length;
+        await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeBegin(id, size, Path.GetFileName(path)), ct).ConfigureAwait(false);
+
+        using var sha = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        using var fs = File.OpenRead(path);
+        byte[] buf = new byte[FileTransferProtocol.ChunkSize];
+        long offset = 0;
+        int read;
+        while ((read = await fs.ReadAsync(buf.AsMemory(0, buf.Length), ct).ConfigureAwait(false)) > 0)
+        {
+            sha.AppendData(buf, 0, read);
+            await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeChunk(id, offset, buf.AsSpan(0, read)), ct).ConfigureAwait(false);
+            offset += read;
+            progress?.Report(size > 0 ? (double)offset / size : 1);
+        }
+        await link.SendAsync(FrameType.FileChunk, FileTransferProtocol.EncodeEnd(id, sha.GetHashAndReset()), ct).ConfigureAwait(false);
+    }
+
     private void OnNv12(DecodedNv12 f)
     {
         int w = _displayW > 0 ? _displayW : f.CodedWidth;

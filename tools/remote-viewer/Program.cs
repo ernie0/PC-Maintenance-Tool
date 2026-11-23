@@ -33,9 +33,11 @@ internal sealed class ViewerWindow : Window
     private readonly Button _connect = new() { Content = "連線", Width = 64, Margin = new Thickness(4, 0, 12, 0) };
     private readonly TextBlock _code = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0), FontWeight = FontWeights.Bold };
     private readonly ComboBox _monitors = new() { Width = 200, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly Button _sendFile = new() { Content = "傳檔", Width = 56, Margin = new Thickness(12, 0, 0, 0) };
     private readonly TextBlock _stats = new() { Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
     private readonly Image _screen = new() { Stretch = Stretch.Uniform, Focusable = true, SnapsToDevicePixels = true };
     private int _fpsFrames;
+    private bool _transferring;
 
     private ViewerClient? _client;
     private CancellationTokenSource? _cts;
@@ -53,9 +55,20 @@ internal sealed class ViewerWindow : Window
         if (cmdArgs.Length >= 1) _host.Text = cmdArgs[0];
         if (cmdArgs.Length >= 2) _port.Text = cmdArgs[1];
 
-        // 測試用：帶 --auto 時載入後自動按「連線」，方便本機重現。
+        // 測試用：帶 --auto 時載入後自動按「連線」；帶 --sendfile <path> 則連上後自動送該檔。
         if (Array.IndexOf(cmdArgs, "--auto") >= 0)
-            Loaded += async (_, _) => { await Task.Delay(500); ToggleConnect(); };
+            Loaded += async (_, _) =>
+            {
+                await Task.Delay(500);
+                ToggleConnect();
+                int fi = Array.IndexOf(cmdArgs, "--sendfile");
+                if (fi >= 0 && fi + 1 < cmdArgs.Length)
+                {
+                    await Task.Delay(1500);
+                    var c = _client;
+                    if (c is not null) await SendFileWithUiAsync(c, cmdArgs[fi + 1]);
+                }
+            };
 
         // 測試用：--snap <png路徑> [第幾張] 把收到的第 N 張畫面存成 PNG（驗證游標合成）後關閉。
         int si = Array.IndexOf(cmdArgs, "--snap");
@@ -75,13 +88,16 @@ internal sealed class ViewerWindow : Window
         bar.Children.Add(_code);
         bar.Children.Add(new TextBlock { Text = "螢幕", Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
         bar.Children.Add(_monitors);
+        bar.Children.Add(_sendFile);
         bar.Children.Add(_stats);
+        _sendFile.Click += (_, _) => OnSendFile();
 
-        // 每秒更新一次 FPS 與解析度
+        // 每秒更新一次 FPS 與解析度（傳檔中不覆蓋進度文字）
         var fpsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         fpsTimer.Tick += (_, _) =>
         {
             int fps = _fpsFrames; _fpsFrames = 0;
+            if (_transferring) return;
             _stats.Text = _client is null ? "" : $"FPS {fps}" + (_bitmap is not null ? $" · {_bitmap.PixelWidth}×{_bitmap.PixelHeight}" : "");
         };
         fpsTimer.Start();
@@ -203,6 +219,30 @@ internal sealed class ViewerWindow : Window
     {
         _clipLastSeen = text; // 避免又被輪詢當成本機變更回送
         try { Clipboard.SetText(text); } catch { }
+    }
+
+    // ---- 傳送檔案到被控端 ----
+
+    private async void OnSendFile()
+    {
+        var client = _client;
+        if (client is null) { _stats.Text = "尚未連線"; return; }
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "選擇要傳到被控端的檔案" };
+        if (dlg.ShowDialog() != true) return;
+        await SendFileWithUiAsync(client, dlg.FileName);
+    }
+
+    private async Task SendFileWithUiAsync(ViewerClient client, string path)
+    {
+        _transferring = true;
+        try
+        {
+            var progress = new Progress<double>(p => _stats.Text = $"傳檔 {System.IO.Path.GetFileName(path)} {p:P0}");
+            await client.SendFileAsync(path, progress);
+            _stats.Text = "傳檔完成：" + System.IO.Path.GetFileName(path);
+        }
+        catch (Exception ex) { _stats.Text = "傳檔失敗：" + ex.Message; }
+        finally { _transferring = false; }
     }
 
     private void PopulateMonitors(IReadOnlyList<MonitorDescriptor> list)
