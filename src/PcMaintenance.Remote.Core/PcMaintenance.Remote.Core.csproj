@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 覆寫根 Directory.Build.props 的 net10.0-windows：Core 要能在 NAS 的 Linux 容器內執行，
+       所以用純 net10.0，只依賴跨平台的 System.Security.Cryptography 與 System.Text.Json。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PcMaintenance.Remote.Core</RootNamespace>
+    <AssemblyName>PcMaintenance.Remote.Core</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

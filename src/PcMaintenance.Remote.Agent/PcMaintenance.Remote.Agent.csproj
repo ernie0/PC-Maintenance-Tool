@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 被控端用 Windows API（DXGI 擷取、Media Foundation 編碼、SendInput），維持 net10.0-windows。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>PcMaintenance.Remote.Agent</RootNamespace>
+    <AssemblyName>PcMaintenance.Remote.Agent</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PcMaintenance.Remote.Core\PcMaintenance.Remote.Core.csproj" />
+  </ItemGroup>
+
+</Project>

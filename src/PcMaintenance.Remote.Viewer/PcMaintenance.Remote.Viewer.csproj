@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 控制端程式庫：Media Foundation 解碼 H.264、連線與收送邏輯。
+       不含 UI，讓 WPF 視窗與無畫面的端對端驗證工具都能引用。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>PcMaintenance.Remote.Viewer</RootNamespace>
+    <AssemblyName>PcMaintenance.Remote.Viewer</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PcMaintenance.Remote.Core\PcMaintenance.Remote.Core.csproj" />
+  </ItemGroup>
+
+</Project>

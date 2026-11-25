@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 被控端擷取＋編碼的本機驗證工具：錄幾秒桌面成 .h264，供人工確認畫質。不隨安裝包派送。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PcMaintenance.Remote.Agent\PcMaintenance.Remote.Agent.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -49,6 +49,9 @@
         <DataTemplate DataType="{x:Type vm:JournalViewModel}">
             <views:JournalView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RemoteAssistViewModel}">
+            <views:RemoteAssistView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
